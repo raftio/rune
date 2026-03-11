@@ -73,7 +73,7 @@ pub async fn invoke(
 
     let env = &state.env;
     let plan = crate::routes::resolve_plan(&agent_name, env.agent_packages_dir.as_deref());
-    let tool_ctx = crate::routes::shared_tool_context(&state.store, env);
+    let tool_ctx = crate::routes::shared_tool_context(&state.store, env, Some(&agent_name));
     let policy = rune_runtime::PolicyEngine::new(
         plan.toolset.clone().into_iter(),
         plan.models.clone(),

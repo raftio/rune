@@ -3,21 +3,28 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
+use futures::TryStreamExt;
 use serde::Deserialize;
 use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio_util::io::StreamReader;
-use futures::TryStreamExt;
 
-use crate::error::RuntimeError;
 use super::{ApiTool, ContentBlock, LlmProvider, LlmResponse, StreamChunk};
+use crate::error::RuntimeError;
 
 fn extract_text_from_blocks(content: &serde_json::Value) -> String {
-    if let Some(t) = content.as_str() { return t.to_string(); }
+    if let Some(t) = content.as_str() {
+        return t.to_string();
+    }
     if let Some(arr) = content.as_array() {
-        return arr.iter()
+        return arr
+            .iter()
             .filter_map(|b| {
-                if b["type"] == "text" { b["text"].as_str().map(str::to_string) } else { None }
+                if b["type"] == "text" {
+                    b["text"].as_str().map(str::to_string)
+                } else {
+                    None
+                }
             })
             .collect::<Vec<_>>()
             .join("\n");
@@ -43,7 +50,12 @@ impl OpenAiClient {
     }
 
     pub fn new_with_base_url(api_key: String, model: String, base_url: String) -> Self {
-        Self { api_key, model, base_url, http: reqwest::Client::new() }
+        Self {
+            api_key,
+            model,
+            base_url,
+            http: reqwest::Client::new(),
+        }
     }
 
     pub fn from_env() -> Option<Self> {
@@ -53,7 +65,10 @@ impl OpenAiClient {
     }
 
     fn endpoint(&self) -> String {
-        format!("{}/v1/chat/completions", self.base_url.trim_end_matches('/'))
+        format!(
+            "{}/v1/chat/completions",
+            self.base_url.trim_end_matches('/')
+        )
     }
 
     /// Convert Anthropic-style messages to OpenAI chat format.
@@ -71,17 +86,22 @@ impl OpenAiClient {
                 }
                 "assistant" => {
                     if let Some(blocks) = content.as_array() {
-                        let tcs: Vec<_> = blocks.iter().filter_map(|b| {
-                            if b["type"] == "tool_use" {
-                                let args = serde_json::to_string(&b["input"])
-                                    .unwrap_or_else(|_| "{}".into());
-                                Some(serde_json::json!({
-                                    "id": b["id"],
-                                    "type": "function",
-                                    "function": { "name": b["name"], "arguments": args },
-                                }))
-                            } else { None }
-                        }).collect();
+                        let tcs: Vec<_> = blocks
+                            .iter()
+                            .filter_map(|b| {
+                                if b["type"] == "tool_use" {
+                                    let args = serde_json::to_string(&b["input"])
+                                        .unwrap_or_else(|_| "{}".into());
+                                    Some(serde_json::json!({
+                                        "id": b["id"],
+                                        "type": "function",
+                                        "function": { "name": b["name"], "arguments": args },
+                                    }))
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
 
                         if !tcs.is_empty() {
                             out.push(serde_json::json!({
@@ -117,14 +137,19 @@ impl OpenAiClient {
     }
 
     fn oai_tools(tools: &[ApiTool]) -> Vec<serde_json::Value> {
-        tools.iter().map(|t| serde_json::json!({
-            "type": "function",
-            "function": {
-                "name": t.name,
-                "description": t.description,
-                "parameters": t.input_schema,
-            },
-        })).collect()
+        tools
+            .iter()
+            .map(|t| {
+                serde_json::json!({
+                    "type": "function",
+                    "function": {
+                        "name": t.name,
+                        "description": t.description,
+                        "parameters": t.input_schema,
+                    },
+                })
+            })
+            .collect()
     }
 
     fn build_body(
@@ -153,8 +178,13 @@ impl OpenAiClient {
         body
     }
 
-    async fn send_request(&self, body: &serde_json::Value) -> Result<reqwest::Response, RuntimeError> {
-        let resp = self.http.post(self.endpoint())
+    async fn send_request(
+        &self,
+        body: &serde_json::Value,
+    ) -> Result<reqwest::Response, RuntimeError> {
+        let resp = self
+            .http
+            .post(self.endpoint())
             .bearer_auth(&self.api_key)
             .json(body)
             .send()
@@ -192,31 +222,62 @@ impl LlmProvider for OpenAiClient {
         let resp = self.send_request(&body).await?;
 
         #[derive(Deserialize)]
-        struct Choice { message: OaiMsg, finish_reason: String }
+        struct Choice {
+            message: OaiMsg,
+            finish_reason: String,
+        }
         #[derive(Deserialize)]
-        struct OaiMsg { content: Option<String>, #[serde(default)] tool_calls: Vec<OaiTc> }
+        struct OaiMsg {
+            content: Option<String>,
+            #[serde(default)]
+            tool_calls: Vec<OaiTc>,
+        }
         #[derive(Deserialize)]
-        struct OaiTc { id: String, function: OaiFn }
+        struct OaiTc {
+            id: String,
+            function: OaiFn,
+        }
         #[derive(Deserialize)]
-        struct OaiFn { name: String, arguments: String }
+        struct OaiFn {
+            name: String,
+            arguments: String,
+        }
         #[derive(Deserialize)]
-        struct Raw { choices: Vec<Choice> }
+        struct Raw {
+            choices: Vec<Choice>,
+        }
 
-        let raw: Raw = resp.json().await
+        let raw: Raw = resp
+            .json()
+            .await
             .map_err(|e| RuntimeError::Engine(format!("OpenAI parse: {e}")))?;
-        let choice = raw.choices.into_iter().next()
+        let choice = raw
+            .choices
+            .into_iter()
+            .next()
             .ok_or_else(|| RuntimeError::Engine("OpenAI empty choices".into()))?;
 
-        let stop_reason = if choice.finish_reason == "tool_calls" { "tool_use" } else { "end_turn" };
+        let stop_reason = if choice.finish_reason == "tool_calls" {
+            "tool_use"
+        } else {
+            "end_turn"
+        };
         let mut content = Vec::new();
         if let Some(text) = choice.message.content.filter(|s| !s.is_empty()) {
             content.push(ContentBlock::Text { text });
         }
         for tc in choice.message.tool_calls {
             let input = serde_json::from_str(&tc.function.arguments).unwrap_or_default();
-            content.push(ContentBlock::ToolUse { id: tc.id, name: tc.function.name, input });
+            content.push(ContentBlock::ToolUse {
+                id: tc.id,
+                name: tc.function.name,
+                input,
+            });
         }
-        Ok(LlmResponse { stop_reason: stop_reason.into(), content })
+        Ok(LlmResponse {
+            stop_reason: stop_reason.into(),
+            content,
+        })
     }
 
     async fn stream(
@@ -237,7 +298,8 @@ impl LlmProvider for OpenAiClient {
             }
         };
 
-        let byte_stream = resp.bytes_stream()
+        let byte_stream = resp
+            .bytes_stream()
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
         let reader = StreamReader::new(byte_stream);
         let mut lines = BufReader::new(reader).lines();
@@ -247,11 +309,22 @@ impl LlmProvider for OpenAiClient {
         let mut stop_reason = "end_turn".to_string();
 
         while let Some(line) = lines.next_line().await.map_err(RuntimeError::Io)? {
-            let data = match line.strip_prefix("data: ") { Some(d) => d.trim(), None => continue };
-            if data.is_empty() || data == "[DONE]" { break; }
-            let val: serde_json::Value = match serde_json::from_str(data) { Ok(v) => v, Err(_) => continue };
+            let data = match line.strip_prefix("data: ") {
+                Some(d) => d.trim(),
+                None => continue,
+            };
+            if data.is_empty() || data == "[DONE]" {
+                break;
+            }
+            let val: serde_json::Value = match serde_json::from_str(data) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
 
-            let choice = match val["choices"].get(0) { Some(c) => c, None => continue };
+            let choice = match val["choices"].get(0) {
+                Some(c) => c,
+                None => continue,
+            };
             let delta = &choice["delta"];
 
             if let Some(text) = delta["content"].as_str() {
@@ -278,7 +351,9 @@ impl LlmProvider for OpenAiClient {
             }
 
             if let Some(reason) = choice["finish_reason"].as_str() {
-                if reason == "tool_calls" { stop_reason = "tool_use".to_string(); }
+                if reason == "tool_calls" {
+                    stop_reason = "tool_use".to_string();
+                }
             }
         }
 
@@ -289,7 +364,10 @@ impl LlmProvider for OpenAiClient {
             on_chunk(StreamChunk::ToolUse { id, name, input });
         }
 
-        on_chunk(StreamChunk::Done { stop_reason, full_text });
+        on_chunk(StreamChunk::Done {
+            stop_reason,
+            full_text,
+        });
         Ok(())
     }
 }

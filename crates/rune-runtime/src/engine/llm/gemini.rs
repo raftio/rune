@@ -6,13 +6,13 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
+use futures::TryStreamExt;
 use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio_util::io::StreamReader;
-use futures::TryStreamExt;
 
-use crate::error::RuntimeError;
 use super::{ApiTool, ContentBlock, LlmProvider, LlmResponse, StreamChunk};
+use crate::error::RuntimeError;
 
 const GEMINI_BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -24,7 +24,11 @@ pub struct GeminiClient {
 
 impl GeminiClient {
     pub fn new(api_key: String, model: String) -> Self {
-        Self { api_key, model, http: reqwest::Client::new() }
+        Self {
+            api_key,
+            model,
+            http: reqwest::Client::new(),
+        }
     }
 
     pub fn from_env() -> Option<Self> {
@@ -40,8 +44,15 @@ impl GeminiClient {
     }
 
     fn endpoint(&self, stream: bool) -> String {
-        let method = if stream { "streamGenerateContent" } else { "generateContent" };
-        format!("{}/{}:{}?key={}", GEMINI_BASE_URL, self.model, method, self.api_key)
+        let method = if stream {
+            "streamGenerateContent"
+        } else {
+            "generateContent"
+        };
+        format!(
+            "{}/{}:{}?key={}",
+            GEMINI_BASE_URL, self.model, method, self.api_key
+        )
     }
 
     /// Convert internal Anthropic-style messages to Gemini `contents` format.
@@ -56,7 +67,13 @@ impl GeminiClient {
                         t.to_string()
                     } else if let Some(arr) = content.as_array() {
                         arr.iter()
-                            .filter_map(|b| if b["type"] == "text" { b["text"].as_str().map(str::to_string) } else { None })
+                            .filter_map(|b| {
+                                if b["type"] == "text" {
+                                    b["text"].as_str().map(str::to_string)
+                                } else {
+                                    None
+                                }
+                            })
                             .collect::<Vec<_>>()
                             .join("\n")
                     } else {
@@ -97,7 +114,8 @@ impl GeminiClient {
                         let mut parts = Vec::new();
                         for b in blocks {
                             if b["type"] == "tool_result" {
-                                let result = b["content"].as_str()
+                                let result = b["content"]
+                                    .as_str()
                                     .map(|s| serde_json::json!({"text": s}))
                                     .unwrap_or_else(|| b["content"].clone());
                                 parts.push(serde_json::json!({
@@ -126,11 +144,16 @@ impl GeminiClient {
         if tools.is_empty() {
             return serde_json::json!([]);
         }
-        let decls: Vec<serde_json::Value> = tools.iter().map(|t| serde_json::json!({
-            "name": t.name,
-            "description": t.description,
-            "parameters": t.input_schema,
-        })).collect();
+        let decls: Vec<serde_json::Value> = tools
+            .iter()
+            .map(|t| {
+                serde_json::json!({
+                    "name": t.name,
+                    "description": t.description,
+                    "parameters": t.input_schema,
+                })
+            })
+            .collect();
         serde_json::json!([{"functionDeclarations": decls}])
     }
 
@@ -163,7 +186,8 @@ impl GeminiClient {
         match candidate["finishReason"].as_str().unwrap_or("STOP") {
             "MAX_TOKENS" => "max_tokens",
             _ => "end_turn",
-        }.into()
+        }
+        .into()
     }
 }
 
@@ -186,7 +210,9 @@ impl LlmProvider for GeminiClient {
         max_tokens: u32,
     ) -> Result<LlmResponse, RuntimeError> {
         let body = Self::build_body(system, messages, tools, max_tokens);
-        let resp = self.http.post(self.endpoint(false))
+        let resp = self
+            .http
+            .post(self.endpoint(false))
             .json(&body)
             .send()
             .await
@@ -198,7 +224,9 @@ impl LlmProvider for GeminiClient {
             return Err(RuntimeError::Engine(format!("Gemini {s}: {b}")));
         }
 
-        let val: serde_json::Value = resp.json().await
+        let val: serde_json::Value = resp
+            .json()
+            .await
             .map_err(|e| RuntimeError::Engine(format!("Gemini parse: {e}")))?;
 
         let candidate = val["candidates"]
@@ -210,7 +238,9 @@ impl LlmProvider for GeminiClient {
             for part in parts {
                 if let Some(text) = part["text"].as_str() {
                     if !text.is_empty() {
-                        content.push(ContentBlock::Text { text: text.to_string() });
+                        content.push(ContentBlock::Text {
+                            text: text.to_string(),
+                        });
                     }
                 } else if !part["functionCall"].is_null() {
                     let fc = &part["functionCall"];
@@ -224,10 +254,15 @@ impl LlmProvider for GeminiClient {
             }
         }
 
-        let has_tool_use = content.iter().any(|b| matches!(b, ContentBlock::ToolUse { .. }));
+        let has_tool_use = content
+            .iter()
+            .any(|b| matches!(b, ContentBlock::ToolUse { .. }));
         let stop_reason = Self::parse_finish_reason(candidate, has_tool_use);
 
-        Ok(LlmResponse { stop_reason, content })
+        Ok(LlmResponse {
+            stop_reason,
+            content,
+        })
     }
 
     async fn stream(
@@ -243,15 +278,11 @@ impl LlmProvider for GeminiClient {
 
         // Gemini streaming requires `alt=sse` on the streamGenerateContent endpoint.
         let url = format!("{}&alt=sse", self.endpoint(true));
-        let resp = self.http.post(&url)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| {
-                let err = RuntimeError::Engine(format!("Gemini HTTP: {e}"));
-                on_chunk(StreamChunk::Error(err.to_string()));
-                err
-            })?;
+        let resp = self.http.post(&url).json(&body).send().await.map_err(|e| {
+            let err = RuntimeError::Engine(format!("Gemini HTTP: {e}"));
+            on_chunk(StreamChunk::Error(err.to_string()));
+            err
+        })?;
 
         if !resp.status().is_success() {
             let s = resp.status();
@@ -261,7 +292,8 @@ impl LlmProvider for GeminiClient {
             return Err(err);
         }
 
-        let byte_stream = resp.bytes_stream()
+        let byte_stream = resp
+            .bytes_stream()
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
         let reader = StreamReader::new(byte_stream);
         let mut lines = BufReader::new(reader).lines();
@@ -272,9 +304,17 @@ impl LlmProvider for GeminiClient {
         let mut stop_reason = "end_turn".to_string();
 
         while let Some(line) = lines.next_line().await.map_err(RuntimeError::Io)? {
-            let data = match line.strip_prefix("data: ") { Some(d) => d.trim(), None => continue };
-            if data.is_empty() { continue; }
-            let val: serde_json::Value = match serde_json::from_str(data) { Ok(v) => v, Err(_) => continue };
+            let data = match line.strip_prefix("data: ") {
+                Some(d) => d.trim(),
+                None => continue,
+            };
+            if data.is_empty() {
+                continue;
+            }
+            let val: serde_json::Value = match serde_json::from_str(data) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
 
             if let Some(parts) = val["candidates"]
                 .get(0)
@@ -301,7 +341,10 @@ impl LlmProvider for GeminiClient {
             on_chunk(StreamChunk::ToolUse { id, name, input });
         }
 
-        on_chunk(StreamChunk::Done { stop_reason, full_text });
+        on_chunk(StreamChunk::Done {
+            stop_reason,
+            full_text,
+        });
         Ok(())
     }
 }

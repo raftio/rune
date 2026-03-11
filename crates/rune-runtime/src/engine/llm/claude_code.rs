@@ -4,9 +4,9 @@
 
 use async_trait::async_trait;
 
-use crate::error::RuntimeError;
-use super::{ApiTool, LlmProvider, LlmResponse, StreamChunk};
 use super::anthropic::AnthropicClient;
+use super::{ApiTool, LlmProvider, LlmResponse, StreamChunk};
+use crate::error::RuntimeError;
 
 pub struct ClaudeCodeClient(AnthropicClient);
 
@@ -44,7 +44,9 @@ impl LlmProvider for ClaudeCodeClient {
         tools: &[ApiTool],
         max_tokens: u32,
     ) -> Result<LlmResponse, RuntimeError> {
-        self.0.call(model, system, messages, tools, max_tokens).await
+        self.0
+            .call(model, system, messages, tools, max_tokens)
+            .await
     }
 
     async fn stream(
@@ -56,6 +58,8 @@ impl LlmProvider for ClaudeCodeClient {
         max_tokens: u32,
         on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
     ) -> Result<(), RuntimeError> {
-        self.0.stream(model, system, messages, tools, max_tokens, on_chunk).await
+        self.0
+            .stream(model, system, messages, tools, max_tokens, on_chunk)
+            .await
     }
 }

@@ -7,16 +7,22 @@ pub async fn create(
 ) -> Result<serde_json::Value, String> {
     let description = input["description"].as_str().ok_or("Missing 'description' parameter")?;
     let schedule_str = input["schedule"].as_str().ok_or("Missing 'schedule' parameter")?;
+    let agent_name = input["agent_name"].as_str().or(ctx.agent_name.as_deref());
+    let channel = input["channel"].as_str();
+    let recipient = input["recipient"].as_str();
     let cron_expr = parse_schedule_to_cron(schedule_str)?;
     let id = Uuid::new_v4().to_string();
 
     sqlx::query(
-        "INSERT INTO schedules (id, description, schedule_input, cron_expr, enabled, created_at) VALUES (?, ?, ?, ?, 1, strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
+        "INSERT INTO schedules (id, description, schedule_input, cron_expr, agent, channel_type, channel_recipient, enabled, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
     )
     .bind(&id)
     .bind(description)
     .bind(schedule_str)
     .bind(&cron_expr)
+    .bind(agent_name)
+    .bind(channel)
+    .bind(recipient)
     .execute(&ctx.db)
     .await
     .map_err(|e| format!("Database error: {e}"))?;
@@ -26,13 +32,16 @@ pub async fn create(
         "description": description,
         "cron": cron_expr,
         "original": schedule_str,
+        "agent": agent_name,
+        "channel": channel,
+        "recipient": recipient,
     }))
 }
 
 pub async fn list(ctx: &ToolContext) -> Result<serde_json::Value, String> {
-    let rows: Vec<(String, Option<String>, Option<String>, Option<String>, bool)> =
+    let rows: Vec<(String, Option<String>, Option<String>, Option<String>, bool, Option<String>, Option<String>)> =
         sqlx::query_as(
-            "SELECT id, description, schedule_input, cron_expr, enabled FROM schedules ORDER BY created_at DESC",
+            "SELECT id, description, schedule_input, cron_expr, enabled, channel_type, channel_recipient FROM schedules ORDER BY created_at DESC",
         )
         .fetch_all(&ctx.db)
         .await
@@ -40,13 +49,15 @@ pub async fn list(ctx: &ToolContext) -> Result<serde_json::Value, String> {
 
     let items: Vec<serde_json::Value> = rows
         .iter()
-        .map(|(id, desc, input, cron, enabled)| {
+        .map(|(id, desc, input, cron, enabled, channel, recipient)| {
             serde_json::json!({
                 "id": id,
                 "description": desc,
                 "schedule_input": input,
                 "cron": cron,
                 "enabled": enabled,
+                "channel": channel,
+                "recipient": recipient,
             })
         })
         .collect();

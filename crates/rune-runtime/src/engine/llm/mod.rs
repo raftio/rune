@@ -1,20 +1,20 @@
 //! LLM provider abstraction and common types.
 
 mod anthropic;
-mod openai;
 mod claude_code;
 mod copilot;
 mod gemini;
+mod openai;
 
 pub use anthropic::AnthropicClient;
-pub use openai::OpenAiClient;
 pub use claude_code::ClaudeCodeClient;
 pub use copilot::CopilotClient;
 pub use gemini::GeminiClient;
+pub use openai::OpenAiClient;
 
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use rune_spec::ToolDescriptor;
+use serde::{Deserialize, Serialize};
 
 use crate::error::RuntimeError;
 
@@ -25,8 +25,14 @@ use crate::error::RuntimeError;
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentBlock {
-    Text { text: String },
-    ToolUse { id: String, name: String, input: serde_json::Value },
+    Text {
+        text: String,
+    },
+    ToolUse {
+        id: String,
+        name: String,
+        input: serde_json::Value,
+    },
 }
 
 pub struct LlmResponse {
@@ -38,8 +44,15 @@ pub struct LlmResponse {
 #[derive(Debug)]
 pub enum StreamChunk {
     Token(String),
-    ToolUse { id: String, name: String, input: serde_json::Value },
-    Done { stop_reason: String, full_text: String },
+    ToolUse {
+        id: String,
+        name: String,
+        input: serde_json::Value,
+    },
+    Done {
+        stop_reason: String,
+        full_text: String,
+    },
     Error(String),
 }
 
@@ -144,7 +157,9 @@ mod tests {
 
     #[test]
     fn content_block_text_serializes_with_type_field() {
-        let block = ContentBlock::Text { text: "hello".into() };
+        let block = ContentBlock::Text {
+            text: "hello".into(),
+        };
         let json = serde_json::to_value(&block).unwrap();
         assert_eq!(json["type"], "text");
         assert_eq!(json["text"], "hello");
@@ -205,6 +220,7 @@ mod tests {
             output_schema_ref: None,
             agent_ref: None,
             max_depth: None,
+            mcp_server: None,
         };
         let api_tools = tools_to_api(&[tool]);
         assert_eq!(api_tools.len(), 1);
@@ -237,6 +253,7 @@ mod tests {
             output_schema_ref: None,
             agent_ref: None,
             max_depth: None,
+            mcp_server: None,
         };
         let api_tools = tools_to_api(&[tool]);
         assert_eq!(api_tools[0].input_schema["type"], "object");
@@ -346,7 +363,10 @@ impl LlmClient {
         let model = model_override.unwrap_or_else(|| self.inner.default_model());
         let provider = self.inner.provider_name();
         let start = std::time::Instant::now();
-        let result = self.inner.call(model, system, messages, tools, max_tokens).await;
+        let result = self
+            .inner
+            .call(model, system, messages, tools, max_tokens)
+            .await;
         crate::metrics::record_model_call_duration(provider, model, start.elapsed().as_secs_f64());
         result
     }
@@ -361,6 +381,8 @@ impl LlmClient {
         on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
     ) -> Result<(), RuntimeError> {
         let model = model_override.unwrap_or_else(|| self.inner.default_model());
-        self.inner.stream(model, system, messages, tools, max_tokens, on_chunk).await
+        self.inner
+            .stream(model, system, messages, tools, max_tokens, on_chunk)
+            .await
     }
 }

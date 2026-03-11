@@ -40,6 +40,8 @@ pub struct ToolContext {
     pub browser_manager: Arc<browser::BrowserManager>,
     pub agent_ops: Option<Arc<dyn AgentOps>>,
     pub env: Arc<PlatformEnv>,
+    /// Name of the currently running agent, used as default for schedule ownership.
+    pub agent_name: Option<String>,
 }
 
 /// A built-in tool definition sent to LLMs.

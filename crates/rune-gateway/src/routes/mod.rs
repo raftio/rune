@@ -56,7 +56,7 @@ pub fn resolve_plan(agent_name: &str, agent_packages_dir: Option<&str>) -> rune_
     rune_runtime::ExecutionPlan::stub(agent_name)
 }
 
-pub fn shared_tool_context(store: &Arc<RuneStore>, env: &Arc<PlatformEnv>) -> Arc<rune_tools::ToolContext> {
+pub fn shared_tool_context(store: &Arc<RuneStore>, env: &Arc<PlatformEnv>, agent_name: Option<&str>) -> Arc<rune_tools::ToolContext> {
     let managers = SHARED.get_or_init(|| SharedManagers {
         process_manager: Arc::new(ProcessManager::new()),
         browser_manager: Arc::new(BrowserManager::new()),
@@ -71,5 +71,6 @@ pub fn shared_tool_context(store: &Arc<RuneStore>, env: &Arc<PlatformEnv>) -> Ar
         browser_manager: managers.browser_manager.clone(),
         agent_ops: Some(agent_ops),
         env: env.clone(),
+        agent_name: agent_name.map(str::to_string),
     })
 }

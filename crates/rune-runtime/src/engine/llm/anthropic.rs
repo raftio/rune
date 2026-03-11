@@ -3,14 +3,14 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
+use futures::TryStreamExt;
 use serde::Deserialize;
 use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio_util::io::StreamReader;
-use futures::TryStreamExt;
 
-use crate::error::RuntimeError;
 use super::{ApiTool, ContentBlock, LlmProvider, LlmResponse, StreamChunk};
+use crate::error::RuntimeError;
 
 pub struct AnthropicClient {
     api_key: String,
@@ -19,7 +19,10 @@ pub struct AnthropicClient {
 
 impl AnthropicClient {
     pub fn new(api_key: String) -> Self {
-        Self { api_key, http: reqwest::Client::new() }
+        Self {
+            api_key,
+            http: reqwest::Client::new(),
+        }
     }
 
     pub fn from_env() -> Option<Self> {
@@ -27,7 +30,9 @@ impl AnthropicClient {
     }
 
     pub fn from_platform_env(env: &rune_env::PlatformEnv) -> Option<Self> {
-        env.anthropic_api_key.as_ref().map(|k| Self::new(k.as_str().to_string()))
+        env.anthropic_api_key
+            .as_ref()
+            .map(|k| Self::new(k.as_str().to_string()))
     }
 
     fn endpoint() -> &'static str {
@@ -52,14 +57,19 @@ impl AnthropicClient {
             body["stream"] = serde_json::json!(true);
         }
         if !tools.is_empty() {
-            body["tools"] = serde_json::to_value(tools)
-                .map_err(|e| RuntimeError::Engine(e.to_string()))?;
+            body["tools"] =
+                serde_json::to_value(tools).map_err(|e| RuntimeError::Engine(e.to_string()))?;
         }
         Ok(body)
     }
 
-    async fn send_request(&self, body: &serde_json::Value) -> Result<reqwest::Response, RuntimeError> {
-        let resp = self.http.post(Self::endpoint())
+    async fn send_request(
+        &self,
+        body: &serde_json::Value,
+    ) -> Result<reqwest::Response, RuntimeError> {
+        let resp = self
+            .http
+            .post(Self::endpoint())
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
             .json(body)
@@ -98,11 +108,19 @@ impl LlmProvider for AnthropicClient {
         let resp = self.send_request(&body).await?;
 
         #[derive(Deserialize)]
-        struct Raw { stop_reason: String, content: Vec<ContentBlock> }
+        struct Raw {
+            stop_reason: String,
+            content: Vec<ContentBlock>,
+        }
 
-        let raw: Raw = resp.json().await
+        let raw: Raw = resp
+            .json()
+            .await
             .map_err(|e| RuntimeError::Engine(format!("Anthropic parse: {e}")))?;
-        Ok(LlmResponse { stop_reason: raw.stop_reason, content: raw.content })
+        Ok(LlmResponse {
+            stop_reason: raw.stop_reason,
+            content: raw.content,
+        })
     }
 
     async fn stream(
@@ -123,7 +141,8 @@ impl LlmProvider for AnthropicClient {
             }
         };
 
-        let byte_stream = resp.bytes_stream()
+        let byte_stream = resp
+            .bytes_stream()
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
         let reader = StreamReader::new(byte_stream);
         let mut lines = BufReader::new(reader).lines();
@@ -133,16 +152,30 @@ impl LlmProvider for AnthropicClient {
         let mut stop_reason = "end_turn".to_string();
 
         while let Some(line) = lines.next_line().await.map_err(RuntimeError::Io)? {
-            let data = match line.strip_prefix("data: ") { Some(d) => d.trim(), None => continue };
-            if data.is_empty() { continue; }
-            let val: serde_json::Value = match serde_json::from_str(data) { Ok(v) => v, Err(_) => continue };
+            let data = match line.strip_prefix("data: ") {
+                Some(d) => d.trim(),
+                None => continue,
+            };
+            if data.is_empty() {
+                continue;
+            }
+            let val: serde_json::Value = match serde_json::from_str(data) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
 
             match val["type"].as_str() {
                 Some("content_block_start") => {
                     let idx = val["index"].as_u64().unwrap_or(0);
                     if val["content_block"]["type"] == "tool_use" {
-                        let id = val["content_block"]["id"].as_str().unwrap_or("").to_string();
-                        let name = val["content_block"]["name"].as_str().unwrap_or("").to_string();
+                        let id = val["content_block"]["id"]
+                            .as_str()
+                            .unwrap_or("")
+                            .to_string();
+                        let name = val["content_block"]["name"]
+                            .as_str()
+                            .unwrap_or("")
+                            .to_string();
                         tool_bufs.insert(idx, (id, name, String::new()));
                     }
                 }
@@ -158,7 +191,8 @@ impl LlmProvider for AnthropicClient {
                         }
                         Some("input_json_delta") => {
                             if let Some(buf) = tool_bufs.get_mut(&idx) {
-                                buf.2.push_str(val["delta"]["partial_json"].as_str().unwrap_or(""));
+                                buf.2
+                                    .push_str(val["delta"]["partial_json"].as_str().unwrap_or(""));
                             }
                         }
                         _ => {}
@@ -180,7 +214,10 @@ impl LlmProvider for AnthropicClient {
             }
         }
 
-        on_chunk(StreamChunk::Done { stop_reason, full_text });
+        on_chunk(StreamChunk::Done {
+            stop_reason,
+            full_text,
+        });
         Ok(())
     }
 }

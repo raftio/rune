@@ -447,28 +447,28 @@ pub fn create_adapter(config: &ChannelConfig) -> Result<Arc<dyn ChannelAdapter>,
 pub fn configs_from_env(env: &rune_env::PlatformEnv) -> Vec<ChannelConfig> {
     let mut configs = Vec::new();
 
-    if env.slack_app_token.is_some() && env.slack_bot_token.is_some() {
+    if let (Some(app_token), Some(bot_token)) = (&env.slack_app_token, &env.slack_bot_token) {
         let mut params = HashMap::new();
-        params.insert("app_token".into(), serde_json::json!("${RUNE_SLACK_APP_TOKEN}"));
-        params.insert("bot_token".into(), serde_json::json!("${RUNE_SLACK_BOT_TOKEN}"));
+        params.insert("app_token".into(), serde_json::json!(app_token.as_str()));
+        params.insert("bot_token".into(), serde_json::json!(bot_token.as_str()));
         configs.push(ChannelConfig { channel_type: "slack".into(), params });
     }
 
-    if env.telegram_bot_token.is_some() {
+    if let Some(token) = &env.telegram_bot_token {
         let mut params = HashMap::new();
-        params.insert("bot_token".into(), serde_json::json!("${RUNE_TELEGRAM_BOT_TOKEN}"));
+        params.insert("bot_token".into(), serde_json::json!(token.as_str()));
         configs.push(ChannelConfig { channel_type: "telegram".into(), params });
     }
 
-    if env.discord_bot_token.is_some() {
+    if let Some(token) = &env.discord_bot_token {
         let mut params = HashMap::new();
-        params.insert("bot_token".into(), serde_json::json!("${RUNE_DISCORD_BOT_TOKEN}"));
+        params.insert("bot_token".into(), serde_json::json!(token.as_str()));
         configs.push(ChannelConfig { channel_type: "discord".into(), params });
     }
 
-    if env.webhook_secret.is_some() {
+    if let Some(secret) = &env.webhook_secret {
         let mut params = HashMap::new();
-        params.insert("secret".into(), serde_json::json!("${RUNE_WEBHOOK_SECRET}"));
+        params.insert("secret".into(), serde_json::json!(secret.as_str()));
         if let Some(port) = &env.webhook_port {
             params.insert("listen_port".into(), serde_json::json!(port));
         }
@@ -478,26 +478,30 @@ pub fn configs_from_env(env: &rune_env::PlatformEnv) -> Vec<ChannelConfig> {
         configs.push(ChannelConfig { channel_type: "webhook".into(), params });
     }
 
-    if env.matrix_access_token.is_some() {
+    if let (Some(homeserver), Some(access_token), Some(user_id)) =
+        (&env.matrix_homeserver, &env.matrix_access_token, &env.matrix_user_id)
+    {
         let mut params = HashMap::new();
-        params.insert("homeserver_url".into(), serde_json::json!("${RUNE_MATRIX_HOMESERVER}"));
-        params.insert("access_token".into(), serde_json::json!("${RUNE_MATRIX_ACCESS_TOKEN}"));
-        params.insert("user_id".into(), serde_json::json!("${RUNE_MATRIX_USER_ID}"));
+        params.insert("homeserver_url".into(), serde_json::json!(homeserver));
+        params.insert("access_token".into(), serde_json::json!(access_token.as_str()));
+        params.insert("user_id".into(), serde_json::json!(user_id));
         configs.push(ChannelConfig { channel_type: "matrix".into(), params });
     }
 
-    if env.mattermost_token.is_some() {
+    if let (Some(server_url), Some(token)) = (&env.mattermost_server_url, &env.mattermost_token) {
         let mut params = HashMap::new();
-        params.insert("server_url".into(), serde_json::json!("${RUNE_MATTERMOST_SERVER_URL}"));
-        params.insert("token".into(), serde_json::json!("${RUNE_MATTERMOST_TOKEN}"));
+        params.insert("server_url".into(), serde_json::json!(server_url));
+        params.insert("token".into(), serde_json::json!(token.as_str()));
         configs.push(ChannelConfig { channel_type: "mattermost".into(), params });
     }
 
-    if env.whatsapp_access_token.is_some() {
+    if let (Some(phone_number_id), Some(access_token), Some(verify_token)) =
+        (&env.whatsapp_phone_number_id, &env.whatsapp_access_token, &env.whatsapp_verify_token)
+    {
         let mut params = HashMap::new();
-        params.insert("phone_number_id".into(), serde_json::json!("${RUNE_WHATSAPP_PHONE_NUMBER_ID}"));
-        params.insert("access_token".into(), serde_json::json!("${RUNE_WHATSAPP_ACCESS_TOKEN}"));
-        params.insert("verify_token".into(), serde_json::json!("${RUNE_WHATSAPP_VERIFY_TOKEN}"));
+        params.insert("phone_number_id".into(), serde_json::json!(phone_number_id));
+        params.insert("access_token".into(), serde_json::json!(access_token.as_str()));
+        params.insert("verify_token".into(), serde_json::json!(verify_token));
         configs.push(ChannelConfig { channel_type: "whatsapp".into(), params });
     }
 

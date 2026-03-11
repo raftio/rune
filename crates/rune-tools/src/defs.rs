@@ -237,12 +237,15 @@ pub fn all() -> Vec<BuiltinToolDef> {
         // ── Scheduling ──────────────────────────────────────────────
         BuiltinToolDef {
             name: "rune@schedule-create",
-            description: "Schedule a recurring task using natural language or cron syntax. Examples: 'every 5 minutes', 'daily at 9am', '0 */5 * * *'.",
+            description: "Schedule a recurring task using natural language or cron syntax. Examples: 'every 5 minutes', 'daily at 9am', '0 */5 * * *'. Optionally specify a channel and recipient so the triggered run automatically delivers results without needing rune@memory-store.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
                     "description": { "type": "string", "description": "What this schedule does" },
-                    "schedule": { "type": "string", "description": "Natural language or cron expression" }
+                    "schedule": { "type": "string", "description": "Natural language or cron expression" },
+                    "agent_name": { "type": "string", "description": "Name of the agent to invoke when the schedule fires. Defaults to the current agent." },
+                    "channel": { "type": "string", "description": "Channel to deliver results to (telegram, slack, email, discord). If set, the triggered run receives channel context automatically." },
+                    "recipient": { "type": "string", "description": "Recipient identifier on the channel (e.g. @username, channel ID, email address)." }
                 },
                 "required": ["description", "schedule"]
             }),

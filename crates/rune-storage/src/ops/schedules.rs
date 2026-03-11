@@ -7,11 +7,14 @@ pub struct ScheduleRow {
     pub id: String,
     pub cron_expr: Option<String>,
     pub agent: Option<String>,
+    pub description: Option<String>,
+    pub channel_type: Option<String>,
+    pub channel_recipient: Option<String>,
 }
 
 pub async fn list_enabled(db: &SqlitePool) -> Result<Vec<ScheduleRow>, StorageError> {
     let rows = sqlx::query_as::<_, ScheduleRow>(
-        "SELECT id, cron_expr, agent FROM schedules WHERE enabled = 1 AND cron_expr IS NOT NULL",
+        "SELECT id, cron_expr, agent, description, channel_type, channel_recipient FROM schedules WHERE enabled = 1 AND cron_expr IS NOT NULL",
     )
     .fetch_all(db)
     .await?;

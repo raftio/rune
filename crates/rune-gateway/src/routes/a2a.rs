@@ -216,7 +216,7 @@ async fn handle_message_send(
     let replica_id = lease.replica_id;
 
     let plan = crate::routes::resolve_plan(agent_name, env.agent_packages_dir.as_deref());
-    let tool_ctx = crate::routes::shared_tool_context(&store, env);
+    let tool_ctx = crate::routes::shared_tool_context(&store, env, Some(agent_name));
     let tools = ToolDispatcher::with_depth(plan.tools.clone(), plan.agent_dir.clone(), incoming_depth)
         .with_tool_context(tool_ctx)
         .with_caller_networks(plan.networks.clone());
@@ -332,7 +332,7 @@ async fn handle_message_stream(
     let replica_id = lease.replica_id;
 
     let plan = crate::routes::resolve_plan(agent_name, env.agent_packages_dir.as_deref());
-    let tool_ctx = crate::routes::shared_tool_context(&store, env);
+    let tool_ctx = crate::routes::shared_tool_context(&store, env, Some(agent_name));
     let tools = ToolDispatcher::with_depth(plan.tools.clone(), plan.agent_dir.clone(), incoming_depth)
         .with_tool_context(tool_ctx)
         .with_caller_networks(plan.networks.clone());

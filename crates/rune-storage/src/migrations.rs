@@ -375,6 +375,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_deployments_ns_alias
     ON agent_deployments(namespace, rollout_alias, agent_name);
 "#,
     },
+    Migration {
+        version: 21,
+        name: "schedules_channel_context",
+        sql: r#"
+ALTER TABLE schedules ADD COLUMN channel_type TEXT;
+ALTER TABLE schedules ADD COLUMN channel_recipient TEXT;
+"#,
+    },
 ];
 
 pub async fn run_migrations(db: &SqlitePool) -> Result<(), StorageError> {

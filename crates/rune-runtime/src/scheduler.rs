@@ -162,8 +162,19 @@ impl SchedulerWorker {
 
             if is_due {
                 let agent = row.agent.as_deref().unwrap_or("default");
+                let description = row.description.as_deref().unwrap_or("scheduled task");
                 info!(schedule_id = %row.id, agent, "triggering scheduled invocation");
-                if let Err(e) = self.trigger_invocation(&row.id, agent, &now_str).await {
+                if let Err(e) = self
+                    .trigger_invocation(
+                        &row.id,
+                        agent,
+                        description,
+                        &now_str,
+                        row.channel_type.as_deref(),
+                        row.channel_recipient.as_deref(),
+                    )
+                    .await
+                {
                     error!(schedule_id = %row.id, error = %e, "failed to trigger invocation");
                 }
             }
@@ -181,7 +192,10 @@ impl SchedulerWorker {
         &self,
         schedule_id: &str,
         agent_name: &str,
+        description: &str,
         now: &str,
+        channel_type: Option<&str>,
+        channel_recipient: Option<&str>,
     ) -> Result<(), RuntimeError> {
         self.store.update_schedule_last_run(schedule_id, now).await?;
 
@@ -195,7 +209,13 @@ impl SchedulerWorker {
         let session_id = self.store.create_session(deployment_id, None, None).await?;
 
         let request_id = uuid::Uuid::new_v4();
-        let payload = serde_json::json!({ "trigger": "schedule", "schedule_id": schedule_id });
+        let mut trigger_msg = format!("[SCHEDULED] {} (schedule_id: {})", description, schedule_id);
+        if let (Some(ch), Some(rec)) = (channel_type, channel_recipient) {
+            trigger_msg.push_str(&format!(
+                "\n[CHANNEL_CONTEXT] channel={ch} recipient={rec}\nSend your report to this channel/recipient using rune@channel-send."
+            ));
+        }
+        let payload = serde_json::json!(trigger_msg);
         self.store
             .insert_request(request_id, session_id, deployment_id, None, &payload)
             .await?;

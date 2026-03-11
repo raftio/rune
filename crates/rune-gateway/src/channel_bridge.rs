@@ -66,7 +66,7 @@ impl ChannelBridgeHandle for RuntimeChannelBridge {
         let result = tokio::time::timeout(AGENT_EXECUTION_TIMEOUT, async {
             if let Some(client) = LlmClient::from_platform_env(&self.env).or_else(LlmClient::from_env) {
                 let plan = resolve_plan(&agent_id_str, &self.env, env_overrides.as_ref());
-                let tool_ctx = crate::routes::shared_tool_context(&store, &self.env);
+                let tool_ctx = crate::routes::shared_tool_context(&store, &self.env, Some(&plan.agent_name));
                 let policy = rune_runtime::PolicyEngine::new(
                     plan.toolset.clone().into_iter(),
                     plan.models.clone(),
