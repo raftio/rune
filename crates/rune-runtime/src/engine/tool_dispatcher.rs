@@ -162,6 +162,9 @@ impl ToolDispatcher {
             ToolRuntime::Agent => {
                 self.dispatch_agent(&descriptor, input, request_id, store).await
             }
+            ToolRuntime::Mcp => {
+                self.dispatch_mcp(&descriptor, input).await
+            }
         };
 
         let status = if result.is_ok() { "ok" } else { "error" };
@@ -301,6 +304,44 @@ impl ToolDispatcher {
             .await;
 
         Ok(output)
+    }
+
+    async fn dispatch_mcp(
+        &self,
+        descriptor: &ToolDescriptor,
+        input: serde_json::Value,
+    ) -> Result<serde_json::Value, RuntimeError> {
+        let server_name = descriptor.mcp_server.as_deref().ok_or_else(|| {
+            RuntimeError::ToolExecution(format!(
+                "MCP tool '{}' missing mcp_server field",
+                descriptor.name
+            ))
+        })?;
+
+        // Resolve MCP server URL from env: RUNE_MCP_{SERVER_NAME}_URL (uppercased, hyphens→underscores).
+        let env_key = format!(
+            "RUNE_MCP_{}_URL",
+            server_name.to_uppercase().replace('-', "_")
+        );
+        let url = std::env::var(&env_key).map_err(|_| {
+            RuntimeError::ToolExecution(format!(
+                "MCP server '{}' URL not configured (set {})",
+                server_name, env_key
+            ))
+        })?;
+
+        // Strip the `{server_name}/` prefix from the tool name to get the MCP tool name.
+        let mcp_tool_name = descriptor.name
+            .strip_prefix(&format!("{server_name}/"))
+            .unwrap_or(&descriptor.name);
+
+        let client = rune_mcp::McpClient::new(url, Default::default());
+        let result = client
+            .call_tool(mcp_tool_name, input)
+            .await
+            .map_err(|e| RuntimeError::ToolExecution(format!("MCP call failed: {e}")))?;
+
+        Ok(result.to_value())
     }
 }
 

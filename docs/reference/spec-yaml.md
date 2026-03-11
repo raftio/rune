@@ -18,6 +18,15 @@ Root-level fields in the `Runefile` that define the agent's identity, instructio
 | `max_steps` | number | `20` | Max LLM turns per request |
 | `timeout_ms` | number | `30000` | Request timeout in milliseconds |
 | `networks` | string[] | `["bridge"]` | rune-network memberships for A2A |
+| `mcp_servers` | array | `[]` | External MCP servers to connect to at load time |
+
+### `mcp_servers` entry fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `name` | string | — | Logical name; used as tool prefix `{name}/{tool}` |
+| `url` | string | — | HTTP URL of the MCP server |
+| `headers` | object | `{}` | HTTP headers (supports `${ENV_VAR}` interpolation) |
 
 ## Example
 

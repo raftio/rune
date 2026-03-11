@@ -13,6 +13,7 @@ rune-a2a = { workspace = true }
 rune-storage = { workspace = true }
 rune-network = { workspace = true }
 rune-tools = { workspace = true }
+rune-mcp = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 serde = { workspace = true }

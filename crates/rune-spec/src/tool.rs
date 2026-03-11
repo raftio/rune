@@ -31,6 +31,10 @@ pub struct ToolDescriptor {
     /// Max recursion depth for agent-to-agent calls (default: 5).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub max_depth: Option<u32>,
+    /// MCP server name (from `mcp_servers:`) this tool belongs to.
+    /// Required when `runtime: mcp`.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub mcp_server: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -42,6 +46,7 @@ pub enum ToolRuntime {
     Container,
     Agent,
     Builtin,
+    Mcp,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,6 +82,7 @@ impl ToolDescriptor {
             output_schema_ref: None,
             agent_ref: None,
             max_depth: None,
+            mcp_server: None,
         }
     }
 

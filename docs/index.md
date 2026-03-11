@@ -5,6 +5,7 @@
 ## Key Features
 
 - **Multi-provider LLM** — Anthropic, OpenAI, Google Gemini, GitHub Copilot, with automatic fallback
+- **MCP support** — agents consume external MCP servers as tools; Rune exposes all deployed agents as an MCP server at `POST /mcp`
 - **Multi-backend** — Run agents as WASM modules, Docker containers, or Kubernetes workloads
 - **Agent-to-Agent (A2A)** — Agents can call each other via the Google A2A protocol over JSON-RPC
 - **40+ Channels** — Integrate with Slack, Telegram, Discord, email, and many more messaging platforms
@@ -18,6 +19,7 @@
 - [Installation](getting-started/installation.md) — Build and install the Rune CLI
 - [Quick Start](getting-started/quickstart.md) — Deploy your first agent in minutes
 - [First Agent](getting-started/first-agent.md) — Build an agent with a custom tool from scratch
+- [MCP](concepts/mcp.md) — Using Rune with Claude Desktop, Cursor, and external MCP servers
 - [Examples](examples/index.md) — Browse all example agents
 - [CLI Reference](reference/cli.md) — All `rune` commands
 - [HTTP API](reference/api.md) — Gateway endpoints

@@ -1,6 +1,18 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Configuration for an external MCP server to connect to at agent load time.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct McpServerConfig {
+    /// Logical name — used as tool name prefix: `{name}/{tool}`.
+    pub name: String,
+    /// HTTP URL of the MCP server (e.g. `http://localhost:3001/mcp`).
+    pub url: String,
+    /// Optional HTTP headers. Values support `${ENV_VAR}` interpolation.
+    #[serde(default)]
+    pub headers: std::collections::HashMap<String, String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentSpec {
     pub name: String,
@@ -21,6 +33,9 @@ pub struct AgentSpec {
     /// share at least one network. Defaults to ["bridge"].
     #[serde(default = "default_networks")]
     pub networks: Vec<String>,
+    /// External MCP servers to connect to at agent load time.
+    #[serde(default)]
+    pub mcp_servers: Vec<McpServerConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

@@ -8,7 +8,7 @@ Tool descriptors define custom tools in the `tools/` directory. Each `*.yaml` fi
 |-------|------|---------|-------------|
 | `name` | string | — | Tool name (used in `toolset`) |
 | `version` | string | `"0.1.0"` | Tool version |
-| `runtime` | enum | `process` | `wasm` / `process` / `container` / `agent` / `builtin` |
+| `runtime` | enum | `process` | `wasm` / `process` / `container` / `agent` / `mcp` / `builtin` |
 | `module` | string | `""` | Path to module (relative to agent dir) |
 | `timeout_ms` | number | `5000` | Per-tool timeout |
 | `retry_policy` | object | `{max_attempts: 1}` | Retry config |
@@ -18,6 +18,7 @@ Tool descriptors define custom tools in the `tools/` directory. Each `*.yaml` fi
 | `output_schema_ref` | string | `null` | Optional schema reference |
 | `agent_ref` | string | `null` | A2A endpoint (required when `runtime: agent`) |
 | `max_depth` | number | `null` | Max recursion depth for agent tools (unlimited when not set) |
+| `mcp_server` | string | `null` | MCP server name from `mcp_servers:` (required when `runtime: mcp`) |
 
 ## Example (Process)
 
@@ -42,6 +43,18 @@ runtime: agent
 agent_ref: local://worker-agent
 timeout_ms: 30000
 max_depth: 3
+```
+
+## Example (MCP)
+
+Manual tool descriptor for an MCP server tool. Usually auto-discovered via `mcp_servers:` in the Runefile — use manual descriptors only when you need fine-grained control.
+
+```yaml
+name: filesystem/read_file
+version: 0.1.0
+runtime: mcp
+mcp_server: filesystem   # matches a name in mcp_servers:
+timeout_ms: 5000
 ```
 
 ## Built-in Tools (`rune@*`)

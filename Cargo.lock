@@ -3754,9 +3754,11 @@ dependencies = [
  "jsonwebtoken",
  "metrics 0.22.4",
  "metrics-exporter-prometheus",
+ "reqwest",
  "rune-a2a",
  "rune-channels",
  "rune-env",
+ "rune-mcp",
  "rune-runtime",
  "rune-spec",
  "rune-storage",
@@ -3797,6 +3799,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "rune-mcp"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "futures-util",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "rune-network"
 version = "0.1.0"
 dependencies = [
@@ -3822,6 +3840,7 @@ dependencies = [
  "reqwest",
  "rune-a2a",
  "rune-env",
+ "rune-mcp",
  "rune-network",
  "rune-spec",
  "rune-storage",

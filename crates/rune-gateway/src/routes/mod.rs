@@ -2,6 +2,7 @@ pub mod a2a;
 pub mod canvas;
 pub mod channels;
 pub mod invoke;
+pub mod mcp;
 pub mod sessions;
 pub mod health;
 

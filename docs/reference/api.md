@@ -35,6 +35,14 @@ Gateway routes exposed by `rune-gateway`. Default gateway base URL: `http://loca
 |--------|------|-------------|
 | GET | `/canvas/:id` | Serve canvas artifact from `.rune/canvas/{id}.html` |
 
+## MCP Server
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/mcp` | MCP JSON-RPC endpoint (`initialize`, `tools/list`, `tools/call`, `ping`). Each deployed agent is exposed as an MCP tool. |
+
+See [MCP concepts](../concepts/mcp.md) for client configuration (Claude Desktop, Cursor, etc.).
+
 ## Channels
 
 | Method | Path | Description |

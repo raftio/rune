@@ -9,6 +9,8 @@ rune-env = { workspace = true }
 rune-a2a = { workspace = true }
 rune-storage = { workspace = true }
 rune-runtime = { workspace = true }
+rune-mcp = { workspace = true }
+reqwest = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 axum = { workspace = true }

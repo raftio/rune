@@ -151,6 +151,29 @@ rune run --agent sentiment-agent \
   "Analyse: 'I love this!', 'Absolutely terrible.', 'It is what it is.'"
 ```
 
+---
+
+### [mcp-agent](../../examples/mcp-agent/)
+
+An agent that connects to external MCP servers (Filesystem + GitHub) and uses their tools. Also shows how to configure Claude Desktop to use Rune as an MCP server.
+
+**Key concepts:**
+- `mcp_servers:` in the Runefile — declaring external MCP servers by name and URL
+- Tool name prefix: `{server-name}/{tool-name}` (e.g. `filesystem/read_file`)
+- `RUNE_MCP_{SERVER}_URL` env var to override server URLs at deploy time
+- `POST /mcp` — Rune's own MCP server endpoint for Claude Desktop / Cursor
+
+```bash
+# Start MCP servers
+npx -y mcp-proxy --port 3001 -- npx @modelcontextprotocol/server-filesystem /tmp
+npx -y mcp-proxy --port 3002 -- npx @modelcontextprotocol/server-github
+
+cd examples/mcp-agent && rune compose up -f rune-compose.yml
+rune run --agent mcp-agent "List files in /tmp and find repos about Raft on GitHub"
+```
+
+---
+
 ## Agent package layout
 
 Every agent is a directory (or single Runefile) with this structure:

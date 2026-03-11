@@ -101,7 +101,8 @@ pub fn router_with_bridge(
         .route("/a2a/:agent_name", post(routes::a2a::jsonrpc_handler))
         .route("/canvas/:id", get(routes::canvas::serve_canvas))
         .route("/channels/webhook", post(routes::channels::webhook_inbound))
-        .route("/channels/status", get(routes::channels::adapter_status));
+        .route("/channels/status", get(routes::channels::adapter_status))
+        .route("/mcp", post(routes::mcp::handle_mcp));
 
     if let Some(handle) = prometheus_handle {
         app = app.route("/metrics", get(move || {

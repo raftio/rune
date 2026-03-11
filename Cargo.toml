@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/rune-spec",
     "crates/rune-a2a",
+    "crates/rune-mcp",
     "crates/rune-store-runtime",
     "crates/rune-storage",
     "crates/rune-network",
@@ -110,6 +111,7 @@ cron = { version = "0.12" }
 # Internal crates
 rune-spec = { path = "crates/rune-spec" }
 rune-a2a = { path = "crates/rune-a2a" }
+rune-mcp = { path = "crates/rune-mcp" }
 rune-store-runtime = { path = "crates/rune-store-runtime" }
 rune-storage = { path = "crates/rune-storage" }
 rune-network = { path = "crates/rune-network" }
