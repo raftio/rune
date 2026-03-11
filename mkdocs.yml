@@ -1,5 +1,5 @@
 site_name: Rune
-site_description: Production-grade AI agent runtime in Rust
+site_description: Rune Agents at scale
 site_url: https://raftio.github.io/rune/
 repo_name: raftio/rune
 repo_url: https://github.com/raftio/rune
