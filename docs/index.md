@@ -38,15 +38,3 @@ my-agent/
 ```
 
 For multi-agent stacks, a `rune-compose.yml` deploys everything together. See [examples](examples/index.md) for complete samples.
-
-## Example Agents
-
-| Example | What it shows |
-|---------|--------------|
-| [basic-example](../examples/basic-example/) | Minimal chat agent — good starting point |
-| [memory-agent](../examples/memory-agent/) | Persistent memory across sessions (`rune@memory-*`) |
-| [web-researcher](../examples/web-researcher/) | Web search + knowledge graph accumulation |
-| [code-assistant](../examples/code-assistant/) | Filesystem + shell + patch — local coding assistant |
-| [multi-agent](../examples/multi-agent/) | A2A delegation + workflow DAG across 3 agents |
-| [scheduled-reporter](../examples/scheduled-reporter/) | Cron schedules + task queue |
-| [custom-tool-python](../examples/custom-tool-python/) | Custom Python process tool |
