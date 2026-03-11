@@ -1,5 +1,7 @@
 # Rune
 
+> **Early development** — APIs and features may change. We welcome feedback and contributions.
+
 **Production-grade AI agent runtime** written in Rust. Rune handles the full lifecycle of AI agents: packaging, deploying, scheduling, executing, networking, and running them at scale — across Docker, Kubernetes, and WASM backends.
 
 ## Key Features
