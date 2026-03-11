@@ -1,0 +1,124 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/rune-spec",
+    "crates/rune-a2a",
+    "crates/rune-store-runtime",
+    "crates/rune-storage",
+    "crates/rune-network",
+    "crates/rune-runtime",
+    "crates/rune-cp",
+    "crates/rune-gateway",
+    "crates/rune-channels",
+    "crates/rune-backend/rune-wasm",
+    "crates/rune-backend/rune-docker",
+    "crates/rune-backend/rune-k8s",
+    "crates/rune-env",
+    "crates/rune-tools",
+    "crates/rune-cmd",
+    "e2e",
+]
+
+[workspace.dependencies]
+# Async
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["io"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+
+# HTTP
+axum = { version = "0.7", features = ["macros"] }
+tower = { version = "0.5", features = ["full"] }
+tower-http = { version = "0.6", features = ["trace", "cors"] }
+hyper = { version = "1" }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "multipart"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_yaml = { version = "0.9" }
+serde_json = { version = "1" }
+
+# Database
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "uuid", "chrono", "json"] }
+
+# Docker
+bollard = { version = "0.17" }
+
+# WASM
+wasmtime = { version = "25", default-features = false, features = ["cranelift", "runtime", "async"] }
+
+# Kubernetes
+kube = { version = "0.98", features = ["runtime", "derive", "client"] }
+k8s-openapi = { version = "0.24", features = ["v1_32"] }
+
+# Tracing
+tracing = { version = "0.1" }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+opentelemetry = { version = "0.27" }
+opentelemetry_sdk = { version = "0.27" }
+opentelemetry-otlp = { version = "0.27", features = ["tonic"] }
+tracing-opentelemetry = { version = "0.27" }
+
+# Metrics
+metrics = { version = "0.22" }
+metrics-exporter-prometheus = { version = "0.16" }
+
+# Errors
+thiserror = { version = "2" }
+anyhow = { version = "1" }
+
+# Utils
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+futures = { version = "0.3" }
+tempfile = { version = "3" }
+async-trait = { version = "0.1" }
+bytes = { version = "1" }
+indexmap = { version = "2", features = ["serde"] }
+nix = { version = "0.29", features = ["signal", "process"] }
+tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
+lettre = { version = "0.11", features = ["tokio1-native-tls"] }
+base64 = { version = "0.22" }
+futures-util = { version = "0.3" }
+zeroize = { version = "1", features = ["derive"] }
+
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+
+# Auth
+jsonwebtoken = { version = "9", default-features = false }
+
+# OCI
+oci-distribution = { version = "0.11" }
+tar = { version = "0.4" }
+flate2 = { version = "1" }
+walkdir = { version = "2" }
+hex = { version = "0.4" }
+
+# Object storage
+object_store = { version = "0.10" }
+url = { version = "2" }
+
+# Raft consensus
+openraft = { version = "0.9", features = ["serde"] }
+tonic = { version = "0.12" }
+prost = { version = "0.13" }
+bincode = { version = "1" }
+
+# Cron
+cron = { version = "0.12" }
+
+# Internal crates
+rune-spec = { path = "crates/rune-spec" }
+rune-a2a = { path = "crates/rune-a2a" }
+rune-store-runtime = { path = "crates/rune-store-runtime" }
+rune-storage = { path = "crates/rune-storage" }
+rune-network = { path = "crates/rune-network" }
+rune-runtime = { path = "crates/rune-runtime" }
+rune-cp = { path = "crates/rune-cp" }
+rune-gateway = { path = "crates/rune-gateway" }
+rune-channels = { path = "crates/rune-channels" }
+rune-env = { path = "crates/rune-env" }
+rune-tools = { path = "crates/rune-tools" }
+rune-wasm-backend = { path = "crates/rune-backend/rune-wasm" }
+rune-docker-backend = { path = "crates/rune-backend/rune-docker" }
+rune-k8s-backend = { path = "crates/rune-backend/rune-k8s" }

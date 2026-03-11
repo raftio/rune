@@ -1,0 +1,15 @@
+version: "1"
+project: code-assistant
+
+rune-env:
+  LOG_LEVEL: info
+  AGENT_PACKAGES_DIR: "."
+  # Mount the workspace to give the agent access to your project files.
+  # Set this to an absolute path or leave as "." for the current directory.
+  RUNE_WORKSPACE_DIR: "."
+
+agents:
+  code-assistant:
+    source: ./Runefile
+    alias: stable
+    replicas: 1

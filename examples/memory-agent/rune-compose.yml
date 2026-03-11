@@ -1,0 +1,13 @@
+version: "1"
+project: memory-agent
+
+rune-env:
+  LOG_LEVEL: info
+  AGENT_PACKAGES_DIR: "."
+  RUNE_CHANNEL_AGENT: memory-agent
+
+agents:
+  memory-agent:
+    source: ./Runefile
+    alias: stable
+    replicas: 1

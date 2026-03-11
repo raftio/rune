@@ -1,0 +1,12 @@
+version: "1"
+project: custom-tool-python
+
+rune-env:
+  LOG_LEVEL: info
+  AGENT_PACKAGES_DIR: "."
+
+agents:
+  sentiment-agent:
+    source: ./Runefile
+    alias: stable
+    replicas: 1

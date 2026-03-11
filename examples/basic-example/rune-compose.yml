@@ -1,0 +1,15 @@
+version: "1"
+project: basic-example
+
+rune-env:
+  LOG_LEVEL: info
+  # Used by channel bridge when gateway has no AGENT_PACKAGES_DIR/RUNE_CHANNEL_AGENT.
+  # "." = project root (where Runefile lives). Set to absolute path if running from elsewhere.
+  AGENT_PACKAGES_DIR: "."
+  RUNE_CHANNEL_AGENT: chat
+
+agents:
+  chat:
+    source: ./Runefile
+    alias: stable
+    replicas: 1

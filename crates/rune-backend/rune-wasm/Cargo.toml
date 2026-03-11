@@ -1,0 +1,22 @@
+[package]
+name = "rune-wasm-backend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rune-spec = { workspace = true }
+rune-env = { workspace = true }
+rune-storage = { workspace = true }
+rune-runtime = { workspace = true }
+wasmtime = { workspace = true }
+tokio = { workspace = true }
+sqlx = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }

@@ -1,0 +1,41 @@
+# Persistent memory agent
+# Demonstrates: rune@memory-store, rune@memory-recall, rune@memory-list
+name: memory-agent
+version: 0.1.0
+instructions: |
+  You are a personal assistant that remembers things across conversations.
+
+  At the START of every conversation:
+  1. Call rune@memory-list to see what you already know.
+  2. Call rune@memory-recall for any relevant keys (e.g. user_name, user_preferences).
+  3. Greet the user by name if you know it.
+
+  Whenever the user tells you their name, preferences, or anything worth remembering:
+  - Call rune@memory-store with a clear, consistent key.
+  - Good keys: user_name, user_language, user_timezone, user_preferences, last_topic.
+  - Confirm to the user that you've saved it.
+
+  Be warm, concise, and personal.
+default_model: default
+toolset:
+  - rune@memory-list
+  - rune@memory-store
+  - rune@memory-recall
+memory_profile: extended
+max_steps: 15
+timeout_ms: 30000
+
+runtime:
+  concurrency_limit: 5
+  streaming_enabled: true
+  checkpoint_policy: on_finish
+  resource_profile: small
+
+models:
+  providers:
+    - anthropic
+    - openai
+  model_mapping:
+    default: claude-haiku-4-5-20251001
+  fallback_policy: next_provider
+  token_budget: 50000

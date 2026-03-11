@@ -1,0 +1,32 @@
+# Researcher specialist agent
+name: researcher
+version: 0.1.0
+instructions: |
+  You are a research specialist. Search the web and fetch pages to answer
+  factual questions thoroughly. Always cite sources.
+default_model: default
+toolset:
+  - rune@web-search
+  - rune@web-fetch
+  - rune@knowledge-add-entity
+  - rune@knowledge-query
+max_steps: 15
+timeout_ms: 60000
+networks:
+  - bridge
+  - internal
+
+runtime:
+  concurrency_limit: 5
+  streaming_enabled: true
+  checkpoint_policy: on_finish
+  resource_profile: small
+
+models:
+  providers:
+    - anthropic
+    - openai
+  model_mapping:
+    default: claude-sonnet-4-6
+  fallback_policy: next_provider
+  token_budget: 100000

@@ -1,0 +1,22 @@
+[package]
+name = "rune-cp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rune-spec = { workspace = true }
+rune-storage = { workspace = true }
+rune-runtime = { workspace = true }
+tokio = { workspace = true }
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+async-trait = { workspace = true }

@@ -1,0 +1,22 @@
+[package]
+name = "e2e"
+version = "0.1.0"
+edition = "2021"
+
+# This crate exists only for integration tests.
+[lib]
+path = "lib.rs"
+
+[dev-dependencies]
+rune-gateway = { path = "../crates/rune-gateway" }
+rune-cp = { path = "../crates/rune-cp" }
+rune-a2a = { path = "../crates/rune-a2a" }
+rune-runtime = { path = "../crates/rune-runtime" }
+rune-env = { path = "../crates/rune-env" }
+rune-spec = { path = "../crates/rune-spec" }
+tokio = { workspace = true }
+axum = { workspace = true }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+uuid = { workspace = true }
