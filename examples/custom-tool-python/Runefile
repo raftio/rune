@@ -1,0 +1,30 @@
+# Custom Python tool example
+# Demonstrates: process tool runtime with a Python implementation
+name: sentiment-agent
+version: 0.1.0
+instructions: |
+  You are a sentiment analysis assistant. When the user provides text or a list
+  of texts, use the "analyse_sentiment" tool to classify each one as positive,
+  negative, or neutral with a confidence score.
+
+  Summarise the overall sentiment trend and highlight any notable outliers.
+default_model: default
+toolset:
+  - analyse_sentiment
+max_steps: 10
+timeout_ms: 30000
+
+runtime:
+  concurrency_limit: 5
+  streaming_enabled: true
+  checkpoint_policy: on_finish
+  resource_profile: small
+
+models:
+  providers:
+    - anthropic
+    - openai
+  model_mapping:
+    default: claude-haiku-4-5-20251001
+  fallback_policy: next_provider
+  token_budget: 50000

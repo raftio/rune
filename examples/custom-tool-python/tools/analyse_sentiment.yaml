@@ -1,0 +1,7 @@
+name: analyse_sentiment
+version: 0.1.0
+runtime: process
+module: tools/analyse_sentiment.py
+timeout_ms: 5000
+retry_policy:
+  max_attempts: 2

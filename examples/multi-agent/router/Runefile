@@ -1,0 +1,57 @@
+# Router agent — classifies requests and delegates to specialist agents
+# Demonstrates: A2A agent tools, rune@task-post
+name: router
+version: 0.1.0
+instructions: |
+  You are a routing agent. Your job is to classify the user's request and
+  forward it to the right specialist agent.
+
+  Available specialists:
+  - "researcher": for questions that require searching the web or looking up facts
+  - "analyst":    for questions about data, metrics, calculations, or summaries
+
+  Workflow:
+  1. Classify the request.
+  2. Call the appropriate specialist tool with the original input.
+  3. Return the specialist's answer verbatim with a brief routing note.
+
+  If the request spans both, call both specialists in sequence and combine the results.
+default_model: default
+toolset:
+  - researcher
+  - analyst
+max_steps: 10
+timeout_ms: 90000
+# Agents in the same network can call each other via A2A
+networks:
+  - bridge
+  - internal
+
+# Custom tools — each one is an A2A call to a specialist agent
+tools:
+  - name: researcher
+    runtime: agent
+    agent_ref: local://researcher
+    max_depth: 2
+    timeout_ms: 60000
+
+  - name: analyst
+    runtime: agent
+    agent_ref: local://analyst
+    max_depth: 2
+    timeout_ms: 60000
+
+runtime:
+  concurrency_limit: 10
+  streaming_enabled: true
+  checkpoint_policy: on_finish
+  resource_profile: small
+
+models:
+  providers:
+    - anthropic
+    - openai
+  model_mapping:
+    default: claude-haiku-4-5-20251001
+  fallback_policy: next_provider
+  token_budget: 50000

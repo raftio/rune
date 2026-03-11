@@ -1,0 +1,31 @@
+# Analyst specialist agent
+name: analyst
+version: 0.1.0
+instructions: |
+  You are a data analyst specialist. Analyse, summarise, and explain data,
+  metrics, trends, and calculations. Show your reasoning step by step.
+  Use shell commands to run quick calculations if needed.
+default_model: default
+toolset:
+  - rune@shell-exec
+  - rune@system-time
+max_steps: 10
+timeout_ms: 30000
+networks:
+  - bridge
+  - internal
+
+runtime:
+  concurrency_limit: 5
+  streaming_enabled: true
+  checkpoint_policy: on_finish
+  resource_profile: small
+
+models:
+  providers:
+    - anthropic
+    - openai
+  model_mapping:
+    default: claude-sonnet-4-6
+  fallback_policy: next_provider
+  token_budget: 80000

@@ -1,0 +1,15 @@
+version: "1"
+project: mcp-agent
+
+rune-env:
+  LOG_LEVEL: info
+  AGENT_PACKAGES_DIR: "."
+  # Override MCP server URLs at deploy time (optional)
+  # RUNE_MCP_FILESYSTEM_URL: http://localhost:3001/mcp
+  # RUNE_MCP_GITHUB_URL: http://localhost:3002/mcp
+
+agents:
+  mcp-agent:
+    source: ./Runefile
+    alias: stable
+    replicas: 1

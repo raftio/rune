@@ -1,0 +1,41 @@
+# Code assistant agent
+# Demonstrates: rune@file-*, rune@apply-patch, rune@shell-exec
+name: code-assistant
+version: 0.1.0
+instructions: |
+  You are a coding assistant with access to the local filesystem and a shell.
+
+  Guidelines:
+  - Use rune@file-list to explore the workspace before making changes.
+  - Use rune@file-read to read files before editing them.
+  - For targeted edits, prefer rune@apply-patch (unified diff) over full rune@file-write.
+  - Use rune@shell-exec to run tests, linters, or build commands after making changes.
+  - Always confirm what you changed and show the test output.
+  - Never overwrite files without reading them first.
+  - Keep shell commands short and safe; avoid destructive operations.
+default_model: default
+toolset:
+  - rune@file-read
+  - rune@file-write
+  - rune@file-list
+  - rune@apply-patch
+  - rune@shell-exec
+  - rune@memory-store
+  - rune@memory-recall
+max_steps: 30
+timeout_ms: 120000
+
+runtime:
+  concurrency_limit: 3
+  streaming_enabled: true
+  checkpoint_policy: on_finish
+  resource_profile: medium
+
+models:
+  providers:
+    - anthropic
+    - openai
+  model_mapping:
+    default: claude-sonnet-4-6
+  fallback_policy: next_provider
+  token_budget: 200000

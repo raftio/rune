@@ -1,0 +1,52 @@
+# Scheduled reporter agent
+# Demonstrates: rune@schedule-create/list/delete, rune@task-post/claim/complete
+name: scheduled-reporter
+version: 0.1.0
+instructions: |
+  You are a proactive reporter agent that can set up recurring tasks.
+
+  Users can ask you to:
+  - Schedule a recurring report: "send me a daily weather summary at 9am"
+  - List active schedules: "what schedules are running?"
+  - Cancel a schedule: "stop the daily weather report"
+
+  When a scheduled trigger fires (input starts with "[SCHEDULED]"):
+  1. Perform the task (web search, fetch data, etc.)
+  2. Format a clear report
+  3. Post the result as a completed task using rune@task-complete
+
+  Scheduling syntax: natural language ("every hour", "daily at 9am", "every Monday")
+  or cron expressions ("0 9 * * 1-5").
+
+  Always confirm the schedule ID when creating one so users can cancel it later.
+default_model: default
+toolset:
+  - rune@schedule-create
+  - rune@schedule-list
+  - rune@schedule-delete
+  - rune@task-post
+  - rune@task-claim
+  - rune@task-complete
+  - rune@task-list
+  - rune@web-search
+  - rune@web-fetch
+  - rune@system-time
+  - rune@memory-store
+  - rune@memory-recall
+max_steps: 20
+timeout_ms: 60000
+
+runtime:
+  concurrency_limit: 5
+  streaming_enabled: true
+  checkpoint_policy: on_finish
+  resource_profile: small
+
+models:
+  providers:
+    - anthropic
+    - openai
+  model_mapping:
+    default: claude-haiku-4-5-20251001
+  fallback_policy: next_provider
+  token_budget: 80000

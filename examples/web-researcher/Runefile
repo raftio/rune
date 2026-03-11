@@ -1,0 +1,40 @@
+# Web researcher agent
+# Demonstrates: rune@web-search, rune@web-fetch, rune@knowledge-* tools
+name: web-researcher
+version: 0.1.0
+instructions: |
+  You are a web researcher. For any research question:
+  1. Use rune@web-search to find relevant pages.
+  2. Use rune@web-fetch to read the most promising pages in full.
+  3. Synthesise the information into a concise, cited answer.
+  4. For recurring topics, add entities and relations to the knowledge graph
+     using rune@knowledge-add-entity and rune@knowledge-add-relation so future
+     queries can be answered faster with rune@knowledge-query.
+
+  Always include source URLs in your answer. Be factual and concise.
+default_model: default
+toolset:
+  - rune@web-search
+  - rune@web-fetch
+  - rune@knowledge-add-entity
+  - rune@knowledge-add-relation
+  - rune@knowledge-query
+  - rune@memory-store
+  - rune@memory-recall
+max_steps: 20
+timeout_ms: 60000
+
+runtime:
+  concurrency_limit: 5
+  streaming_enabled: true
+  checkpoint_policy: on_finish
+  resource_profile: small
+
+models:
+  providers:
+    - anthropic
+    - openai
+  model_mapping:
+    default: claude-sonnet-4-6
+  fallback_policy: next_provider
+  token_budget: 150000

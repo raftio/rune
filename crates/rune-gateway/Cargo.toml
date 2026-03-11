@@ -1,0 +1,36 @@
+[package]
+name = "rune-gateway"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rune-spec = { workspace = true }
+rune-env = { workspace = true }
+rune-a2a = { workspace = true }
+rune-storage = { workspace = true }
+rune-runtime = { workspace = true }
+rune-mcp = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+hyper = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+futures = { workspace = true }
+bytes = { workspace = true }
+async-trait = { workspace = true }
+tokio-stream = { workspace = true }
+rune-tools = { workspace = true }
+rune-channels = { workspace = true }
+jsonwebtoken = { workspace = true }
+metrics = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }

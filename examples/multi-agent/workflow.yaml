@@ -1,0 +1,19 @@
+name: research-and-analyse
+version: 0.1.0
+description: >
+  Research a topic then analyse the findings.
+  Steps run sequentially: researcher fetches facts, analyst synthesises them.
+timeout_ms: 120000
+output_step: "{{ steps.analyst.output }}"
+
+steps:
+  - id: researcher
+    agent_ref: local://researcher
+    input_template: "Research the following and return raw findings: {{ input }}"
+
+  - id: analyst
+    agent_ref: local://analyst
+    input_template: |
+      Analyse and summarise the following research findings:
+      {{ steps.researcher.output }}
+    depends_on: [researcher]

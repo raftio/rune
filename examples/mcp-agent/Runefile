@@ -1,0 +1,58 @@
+# MCP agent example
+# Demonstrates: connecting to external MCP servers and using their tools
+name: mcp-agent
+version: 0.1.0
+instructions: |
+  You are a helpful assistant with access to the local filesystem and GitHub via MCP tools.
+
+  Filesystem tools (filesystem/*):
+  - Use filesystem/read_file to read files
+  - Use filesystem/write_file to write files
+  - Use filesystem/list_directory to list a directory
+
+  GitHub tools (github/*):
+  - Use github/search_repositories to find repos
+  - Use github/create_issue to file issues
+  - Use github/get_pull_request to inspect PRs
+
+  Always check what tools are available before responding.
+  Prefer built-in rune@ tools when MCP tools are unavailable.
+default_model: default
+toolset:
+  # MCP tools — prefixed with server name
+  - filesystem/read_file
+  - filesystem/write_file
+  - filesystem/list_directory
+  - github/search_repositories
+  - github/create_issue
+  - github/get_pull_request
+  # Built-in fallbacks
+  - rune@memory-store
+  - rune@memory-recall
+max_steps: 20
+timeout_ms: 60000
+
+# External MCP servers — Rune connects and auto-discovers tools at startup
+mcp_servers:
+  - name: filesystem
+    url: http://localhost:3001/mcp
+
+  - name: github
+    url: http://localhost:3002/mcp
+    headers:
+      Authorization: "Bearer ${GITHUB_TOKEN}"
+
+runtime:
+  concurrency_limit: 5
+  streaming_enabled: true
+  checkpoint_policy: on_finish
+  resource_profile: small
+
+models:
+  providers:
+    - anthropic
+    - openai
+  model_mapping:
+    default: claude-sonnet-4-6
+  fallback_policy: next_provider
+  token_budget: 100000

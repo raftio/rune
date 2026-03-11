@@ -1,0 +1,37 @@
+# Agent identity & behaviour
+name: chat
+version: 0.1.0
+instructions: |
+  You are a helpful conversational assistant. Reply concisely and naturally.
+default_model: default
+toolset: 
+  - rune@memory-store
+  - rune@memory-recall
+  - rune@knowledge-add-entity
+  - rune@knowledge-add-relation
+  - rune@knowledge-query
+memory_profile: standard
+max_steps: 10
+timeout_ms: 30000
+
+# Runtime configuration
+runtime:
+  concurrency_limit: 10
+  health_probe:
+    path: /health
+    interval_ms: 5000
+  startup_timeout_ms: 10000
+  request_timeout_ms: 30000
+  streaming_enabled: true
+  checkpoint_policy: on_finish
+  resource_profile: small
+
+# Model configuration
+models:
+  providers:
+    - openai
+  model_mapping:
+    default: gpt-4o-mini
+  fallback_policy: next_provider
+  token_budget: 100000
+  safety_policy: standard
