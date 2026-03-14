@@ -6,6 +6,7 @@ pub mod registry;
 pub mod router;
 pub mod telegram;
 pub mod types;
+pub mod webhook;
 
 pub use bridge::{BridgeManager, ChannelBridgeHandle};
 pub use config::*;
