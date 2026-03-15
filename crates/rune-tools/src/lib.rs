@@ -1,19 +1,7 @@
 pub mod defs;
-pub mod fs;
-pub mod web;
-pub mod shell;
-pub mod system;
 pub mod memory;
-pub mod knowledge;
-pub mod task;
-pub mod schedule;
 pub mod process;
-pub mod agent;
-pub mod media;
-pub mod docker;
 pub mod browser;
-pub mod channel;
-pub mod canvas;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -92,78 +80,10 @@ pub async fn execute(
         .ok_or_else(|| format!("not a builtin tool: {name}"))?;
 
     match suffix {
-        // Filesystem
-        "file-read" => fs::file_read(&input, ctx).await,
-        "file-write" => fs::file_write(&input, ctx).await,
-        "file-list" => fs::file_list(&input, ctx).await,
-        "apply-patch" => fs::apply_patch(&input, ctx).await,
-        // Web
-        "web-search" => web::web_search(&input).await,
-        "web-fetch" => web::web_fetch(&input).await,
-        // Shell
-        "shell-exec" => shell::shell_exec(&input).await,
-        // System
-        "system-time" => Ok(system::system_time()),
-        "location-get" => system::location_get().await,
         // Memory
         "memory-store" => memory::store(&input, ctx).await,
         "memory-recall" => memory::recall(&input, ctx).await,
         "memory-list" => memory::list(&input, ctx).await,
-        // Knowledge graph
-        "knowledge-add-entity" => knowledge::add_entity(&input, ctx).await,
-        "knowledge-add-relation" => knowledge::add_relation(&input, ctx).await,
-        "knowledge-query" => knowledge::query(&input, ctx).await,
-        // Task queue
-        "task-post" => task::post(&input, ctx).await,
-        "task-claim" => task::claim(&input, ctx).await,
-        "task-complete" => task::complete(&input, ctx).await,
-        "task-list" => task::list(&input, ctx).await,
-        "event-publish" => task::event_publish(&input, ctx).await,
-        // Scheduling
-        "schedule-create" => schedule::create(&input, ctx).await,
-        "schedule-list" => schedule::list(ctx).await,
-        "schedule-delete" => schedule::delete(&input, ctx).await,
-        "cron-create" => schedule::cron_create(&input, ctx).await,
-        "cron-list" => schedule::cron_list(ctx).await,
-        "cron-cancel" => schedule::cron_cancel(&input, ctx).await,
-        // Process management
-        "process-start" => process::start(&input, ctx).await,
-        "process-poll" => process::poll(&input, ctx).await,
-        "process-write" => process::write(&input, ctx).await,
-        "process-kill" => process::kill(&input, ctx).await,
-        "process-list" => process::list(ctx).await,
-        // Media
-        "image-analyze" => media::image_analyze(&input, ctx).await,
-        "image-generate" => media::image_generate(&input, ctx).await,
-        "media-describe" => media::media_describe(&input, ctx).await,
-        "media-transcribe" => media::media_transcribe(&input, ctx).await,
-        "text-to-speech" => media::text_to_speech(&input, ctx).await,
-        "speech-to-text" => media::speech_to_text(&input, ctx).await,
-        // Agent
-        "agent-send" => agent::agent_send(&input, ctx).await,
-        "agent-list" => agent::agent_list(ctx).await,
-        "agent-find" => agent::agent_find(&input, ctx).await,
-        "agent-spawn" => agent::agent_spawn(&input, ctx).await,
-        "agent-kill" => agent::agent_kill(&input, ctx).await,
-        "a2a-discover" => agent::a2a_discover(&input).await,
-        "a2a-send" => agent::a2a_send(&input).await,
-        // Docker
-        "docker-exec" => docker::docker_exec(&input).await,
-        // Browser
-        "browser-navigate" => browser::navigate(&input, ctx).await,
-        "browser-click" => browser::click(&input, ctx).await,
-        "browser-type" => browser::type_text(&input, ctx).await,
-        "browser-screenshot" => browser::screenshot(ctx).await,
-        "browser-read-page" => browser::read_page(ctx).await,
-        "browser-close" => browser::close(ctx).await,
-        "browser-scroll" => browser::scroll(&input, ctx).await,
-        "browser-wait" => browser::wait(&input, ctx).await,
-        "browser-run-js" => browser::run_js(&input, ctx).await,
-        "browser-back" => browser::back(ctx).await,
-        // Channel
-        "channel-send" => channel::channel_send(&input, &ctx.env).await,
-        // Canvas
-        "canvas-present" => canvas::canvas_present(&input, ctx).await,
 
         other => Err(format!("unknown builtin tool: rune@{other}")),
     }

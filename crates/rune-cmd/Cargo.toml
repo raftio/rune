@@ -14,7 +14,6 @@ rune-storage = { workspace = true }
 rune-runtime = { workspace = true }
 rune-cp = { workspace = true }
 rune-gateway = { workspace = true }
-rune-channels = { workspace = true }
 rune-wasm-backend = { workspace = true }
 rune-docker-backend = { workspace = true }
 rune-k8s-backend = { workspace = true }
