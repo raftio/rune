@@ -204,47 +204,11 @@ async fn run_server(args: &StartArgs, platform_env: PlatformEnv) -> Result<()> {
         }
     });
 
-    // --- Channel bridge setup ---
-    let channel_bridge = Arc::new(rune_gateway::RuntimeChannelBridge::new(store.clone(), platform_env.clone()));
-    let bridge_ref = Arc::new(rune_gateway::ChannelBridgeRef::new(channel_bridge.clone()));
-    let channel_router = Arc::new(rune_channels::AgentRouter::new());
 
-    let mut bridge_manager = rune_channels::BridgeManager::new(channel_bridge, channel_router);
-
-    let channel_configs = load_channel_configs(&platform_env);
-    let mut channels_attempted = 0u32;
-    let mut channels_started = 0u32;
-    for cfg in &channel_configs {
-        channels_attempted += 1;
-        match rune_channels::create_adapter(cfg) {
-            Ok(adapter) => {
-                let name = adapter.name().to_string();
-                if let Err(e) = bridge_manager.start_adapter(adapter).await {
-                    tracing::warn!(channel = %name, error = %e, "Failed to start channel adapter");
-                } else {
-                    channels_started += 1;
-                    tracing::info!(channel = %name, "Channel adapter started");
-                }
-            }
-            Err(e) => {
-                tracing::warn!(channel = %cfg.channel_type, error = %e, "Failed to create channel adapter");
-            }
-        }
-    }
-    if channels_attempted > 0 && channels_started == 0 {
-        tracing::error!(
-            attempted = channels_attempted,
-            "All channel adapters failed to start — channels will be unavailable"
-        );
-    }
-
-    bridge_ref.update_statuses(bridge_manager.adapter_statuses());
-
-    let gw_router = rune_gateway::router_with_bridge(
+    let gw_router = rune_gateway::router(
         store.clone(),
         Some(backend.clone()),
         Some(prometheus_handle),
-        Some(bridge_ref),
         platform_env.clone(),
     );
     let cp_router = rune_cp::router(store.clone());
@@ -260,50 +224,6 @@ async fn run_server(args: &StartArgs, platform_env: PlatformEnv) -> Result<()> {
 
     tokio::try_join!(axum::serve(gw, gw_router), axum::serve(cp, cp_router))?;
 
-    bridge_manager.stop().await;
 
     bail!("server exited unexpectedly");
-}
-
-/// Load channel adapter configs from `channels.yaml` (if present) or env vars.
-fn load_channel_configs(env: &PlatformEnv) -> Vec<rune_channels::ChannelConfig> {
-    let config_paths = [
-        "channels.yaml",
-        "channels.yml",
-        "/etc/rune/channels.yaml",
-    ];
-
-    for path in &config_paths {
-        if let Ok(contents) = std::fs::read_to_string(path) {
-            match serde_yaml::from_str::<rune_channels::ChannelsFile>(&contents) {
-                Ok(file) => {
-                    tracing::info!(path = %path, count = file.channels.len(), "Loaded channel config");
-                    return file.channels;
-                }
-                Err(e) => {
-                    tracing::warn!(path = %path, error = %e, "Failed to parse channel config");
-                }
-            }
-        }
-    }
-
-    if let Some(path) = &env.channels_config_path {
-        if let Ok(contents) = std::fs::read_to_string(path) {
-            match serde_yaml::from_str::<rune_channels::ChannelsFile>(&contents) {
-                Ok(file) => {
-                    tracing::info!(path = %path, count = file.channels.len(), "Loaded channel config");
-                    return file.channels;
-                }
-                Err(e) => {
-                    tracing::warn!(path = %path, error = %e, "Failed to parse channel config");
-                }
-            }
-        }
-    }
-
-    let configs = rune_channels::configs_from_env(env);
-    if !configs.is_empty() {
-        tracing::info!(count = configs.len(), "Loaded channel config from env vars");
-    }
-    configs
 }

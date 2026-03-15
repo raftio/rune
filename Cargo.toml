@@ -10,7 +10,6 @@ members = [
     "crates/rune-runtime",
     "crates/rune-cp",
     "crates/rune-gateway",
-    "crates/rune-channels",
     "crates/rune-backend/rune-wasm",
     "crates/rune-backend/rune-docker",
     "crates/rune-backend/rune-k8s",
@@ -119,7 +118,6 @@ rune-network = { path = "crates/rune-network" }
 rune-runtime = { path = "crates/rune-runtime" }
 rune-cp = { path = "crates/rune-cp" }
 rune-gateway = { path = "crates/rune-gateway" }
-rune-channels = { path = "crates/rune-channels" }
 rune-env = { path = "crates/rune-env" }
 rune-tools = { path = "crates/rune-tools" }
 rune-wasm-backend = { path = "crates/rune-backend/rune-wasm" }
