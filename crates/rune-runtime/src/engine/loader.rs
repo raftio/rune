@@ -1,8 +1,13 @@
 use std::path::{Path, PathBuf};
 
 use rune_spec::{AgentPackage, ModelsSpec, ToolDescriptor};
+use tracing::warn;
 
 use crate::error::RuntimeError;
+
+/// GitHub raw content base URL — skills are fetched from here when not found locally.
+/// Pattern: `{BASE}/{owner}/{repo}/HEAD/{skill_name}/SKILL.md`
+const GITHUB_RAW_BASE: &str = "https://raw.githubusercontent.com";
 
 #[cfg(test)]
 mod tests {
@@ -97,6 +102,67 @@ mod tests {
     }
 
     #[test]
+    fn from_dir_skills_are_appended_to_instructions() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("Runefile"),
+            "name: a\nversion: 0.1.0\ninstructions: Base.\ndefault_model: d\nruntime: {}\nmodels: {}\nskills:\n  - owner/repo/my-skill\n",
+        )
+        .unwrap();
+
+        let skill_dir = dir.path().join("skills/owner/repo/my-skill");
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        std::fs::write(skill_dir.join("SKILL.md"), "Extra skill knowledge.").unwrap();
+
+        let plan = ExecutionPlan::from_dir(dir.path()).unwrap();
+        assert!(plan.instructions.contains("Base."));
+        assert!(plan.instructions.contains("Extra skill knowledge."));
+    }
+
+    // --- github_skill_url ---
+
+    #[test]
+    fn github_skill_url_builds_correct_url() {
+        let url = github_skill_url("anthropics/claude-code/frontend-design").unwrap();
+        assert_eq!(
+            url,
+            "https://raw.githubusercontent.com/anthropics/claude-code/HEAD/frontend-design/SKILL.md"
+        );
+    }
+
+    #[test]
+    fn github_skill_url_requires_three_segments() {
+        assert!(github_skill_url("owner/repo").is_none());
+        assert!(github_skill_url("just-one").is_none());
+    }
+
+    #[test]
+    fn github_skill_url_skill_name_with_hyphens() {
+        let url = github_skill_url("vercel-labs/agent-skills/find-skills").unwrap();
+        assert!(url.contains("/vercel-labs/agent-skills/HEAD/find-skills/SKILL.md"));
+    }
+
+    // --- from_dir_async: local skills still work ---
+
+    #[tokio::test]
+    async fn from_dir_async_local_skill_injected() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("Runefile"),
+            "name: a\nversion: 0.1.0\ninstructions: Base.\ndefault_model: d\nruntime: {}\nmodels: {}\nskills:\n  - owner/repo/my-skill\n",
+        )
+        .unwrap();
+        let skill_dir = dir.path().join("skills/owner/repo/my-skill");
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        std::fs::write(skill_dir.join("SKILL.md"), "Local skill content.").unwrap();
+
+        let http = reqwest::Client::new();
+        let plan = ExecutionPlan::from_dir_async(dir.path(), &http).await.unwrap();
+        assert!(plan.instructions.contains("Base."));
+        assert!(plan.instructions.contains("Local skill content."));
+    }
+
+    #[test]
     fn from_dir_with_runefile_uses_it() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(
@@ -136,9 +202,68 @@ impl ExecutionPlan {
                 toolset.push(t.name.clone());
             }
         }
+        let instructions = if pkg.skill_instructions.is_empty() {
+            pkg.spec.instructions
+        } else {
+            format!("{}\n\n{}", pkg.spec.instructions.trim_end(), pkg.skill_instructions)
+        };
+
         Ok(Self {
             agent_name: pkg.spec.name,
-            instructions: pkg.spec.instructions,
+            instructions,
+            default_model: pkg.spec.default_model,
+            max_steps: pkg.spec.max_steps,
+            timeout_ms: pkg.spec.timeout_ms,
+            tools: pkg.tools,
+            agent_dir: agent_dir.to_path_buf(),
+            models: pkg.models,
+            toolset,
+            networks: pkg.spec.networks,
+        })
+    }
+
+    /// Like [`from_dir`] but also fetches skills that are declared in the Runefile
+    /// yet missing from the local `skills/` directory. Skills are retrieved from
+    /// GitHub raw content using the `owner/repo/skill-name` path as:
+    ///
+    /// ```text
+    /// https://raw.githubusercontent.com/<owner>/<repo>/HEAD/<skill-name>/SKILL.md
+    /// ```
+    ///
+    /// This is the canonical storage location for skills published on SkillsMP
+    /// (<https://skillsmp.com>). Fetch failures are logged and silently skipped so
+    /// the agent can still start with partial skill coverage.
+    pub async fn from_dir_async(agent_dir: &Path, http: &reqwest::Client) -> Result<Self, RuntimeError> {
+        let pkg = AgentPackage::load(agent_dir)
+            .map_err(|e| RuntimeError::Spec(e.to_string()))?;
+
+        let mut toolset: Vec<String> = pkg.spec.toolset.clone();
+        for t in &pkg.tools {
+            if !toolset.contains(&t.name) {
+                toolset.push(t.name.clone());
+            }
+        }
+
+        // Fetch skills that weren't found in the local skills/ directory.
+        let remote_parts = fetch_missing_skills(http, &pkg.missing_skills).await;
+
+        let skill_instructions = if remote_parts.is_empty() {
+            pkg.skill_instructions
+        } else if pkg.skill_instructions.is_empty() {
+            remote_parts
+        } else {
+            format!("{}\n\n{}", pkg.skill_instructions, remote_parts)
+        };
+
+        let instructions = if skill_instructions.is_empty() {
+            pkg.spec.instructions
+        } else {
+            format!("{}\n\n{}", pkg.spec.instructions.trim_end(), skill_instructions)
+        };
+
+        Ok(Self {
+            agent_name: pkg.spec.name,
+            instructions,
             default_model: pkg.spec.default_model,
             max_steps: pkg.spec.max_steps,
             timeout_ms: pkg.spec.timeout_ms,
@@ -166,4 +291,52 @@ impl ExecutionPlan {
             networks: vec!["bridge".into()],
         }
     }
+}
+
+/// Fetch SKILL.md content for skills not found locally.
+///
+/// Each `skill_ref` is expected in `owner/repo/skill-name` format.
+/// The file is retrieved from:
+///   `https://raw.githubusercontent.com/<owner>/<repo>/HEAD/<skill-name>/SKILL.md`
+///
+/// Failures (network, 404, etc.) are logged and skipped.
+async fn fetch_missing_skills(http: &reqwest::Client, missing: &[String]) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    for skill_ref in missing {
+        match github_skill_url(skill_ref) {
+            Some(url) => {
+                match http.get(&url).send().await {
+                    Ok(resp) if resp.status().is_success() => {
+                        match resp.text().await {
+                            Ok(text) => parts.push(text.trim().to_string()),
+                            Err(e) => warn!("Failed to read skill body for '{skill_ref}': {e}"),
+                        }
+                    }
+                    Ok(resp) => {
+                        warn!("Skill '{skill_ref}' not found remotely (HTTP {})", resp.status());
+                    }
+                    Err(e) => {
+                        warn!("Failed to fetch skill '{skill_ref}' from {url}: {e}");
+                    }
+                }
+            }
+            None => {
+                warn!("Skill ref '{skill_ref}' is not in 'owner/repo/skill-name' format, skipping remote fetch");
+            }
+        }
+    }
+    parts.join("\n\n")
+}
+
+/// Build a GitHub raw content URL for a skill ref `owner/repo/skill-name`.
+/// Returns `None` if the ref doesn't have exactly three path segments.
+fn github_skill_url(skill_ref: &str) -> Option<String> {
+    let parts: Vec<&str> = skill_ref.splitn(3, '/').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    let (owner, repo, skill_name) = (parts[0], parts[1], parts[2]);
+    Some(format!(
+        "{GITHUB_RAW_BASE}/{owner}/{repo}/HEAD/{skill_name}/SKILL.md"
+    ))
 }
