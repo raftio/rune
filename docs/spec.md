@@ -72,6 +72,7 @@ Root-level fields that define the agent's identity, system prompt, toolset, and 
 | `instructions` | string | **required** | System prompt sent to the LLM before every conversation. |
 | `default_model` | string | **required** | Logical model alias resolved via `models → model_mapping`. |
 | `toolset` | string[] | `[]` | Tool names to enable. Built-in tools use the `rune@` prefix (e.g. `rune@shell-exec`). Custom tools are defined in `tools/*.yaml`. |
+| `skills` | string[] | `[]` | SkillsMP skill references in `owner/repo/skill-name` format. The content of each skill's `SKILL.md` is appended to `instructions` at agent load time. Install skills locally with `npx skills add owner/repo/skill-name`. |
 | `memory_profile` | enum | `minimal` | Controls how much conversation history is retained. Values: `minimal` / `standard` / `extended`. |
 | `routing_hints` | object | `{}` | Arbitrary key-value metadata passed to the scheduler / load-balancer. |
 | `max_steps` | number | `20` | Maximum number of LLM turns (tool call + response pairs) per request. |
@@ -98,6 +99,8 @@ toolset:
   - rune@file-read
   - rune@web-search
   - my_custom_tool
+skills:
+  - anthropics/claude-code/frontend-design
 memory_profile: standard
 max_steps: 15
 timeout_ms: 60000

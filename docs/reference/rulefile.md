@@ -13,6 +13,7 @@ Root-level fields in the `Runefile` that define the agent's identity, instructio
 | `instructions` | string | — | System prompt (required) |
 | `default_model` | string | — | Model alias from `models → model_mapping` (required) |
 | `toolset` | string[] | `[]` | Tool names (built-in `rune@*` or custom from `tools/`) |
+| `skills` | string[] | `[]` | SkillsMP skill references (`owner/repo/skill-name`). Each skill's `SKILL.md` is injected into the agent's instructions at load time. Install with `npx skills add owner/repo/skill-name`. |
 | `memory_profile` | enum | `minimal` | `minimal` / `standard` / `extended` |
 | `routing_hints` | object | `{}` | Extra routing metadata |
 | `max_steps` | number | `20` | Max LLM turns per request |
@@ -40,6 +41,8 @@ toolset:
   - rune@file-read
   - rune@web-search
   - my_custom_tool
+skills:
+  - anthropics/claude-code/frontend-design
 memory_profile: standard
 max_steps: 15
 timeout_ms: 60000
