@@ -174,6 +174,32 @@ rune run --agent mcp-agent "List files in /tmp and find repos about Raft on GitH
 
 ---
 
+### [skillsmp-agent](../../examples/skillsmp-agent/)
+
+An agent that integrates with [SkillsMP](https://skillsmp.com) — a marketplace of 66,500+ reusable instruction packages (skills). Demonstrates two complementary patterns:
+
+- **Static skills** — skills declared in `skills:` are loaded from local `SKILL.md` files and injected into the agent's instructions at load time.
+- **Dynamic skills** — the SkillsMP MCP server lets the agent search, read, and apply skills at runtime without redeploying.
+
+**Key concepts:**
+- `skills:` field in the Runefile — list `owner/repo/skill-name` references
+- Skills are stored at `skills/<owner>/<repo>/<skill-name>/SKILL.md` (install with `npx skills add`)
+- The SkillsMP MCP server exposes search and fetch tools for runtime skill discovery
+
+```bash
+# Install skills locally (static — Option A)
+npx skills add anthropics/claude-code/frontend-design
+npx skills add vercel-labs/agent-skills/find-skills
+
+# Start the SkillsMP MCP server (dynamic — Option B)
+SKILLSMP_API_KEY=<key> npx skillsmp-mcp-server --transport http --port 3010
+
+cd examples/skillsmp-agent && rune compose up -f rune-compose.yml
+rune run --agent skillsmp-agent "Help me design a responsive landing page."
+```
+
+---
+
 ## Agent package layout
 
 Every agent is a directory (or single Runefile) with this structure:
@@ -181,9 +207,11 @@ Every agent is a directory (or single Runefile) with this structure:
 ```
 my-agent/
 ├── Runefile            # Required: identity, instructions, runtime, models
-└── tools/              # Optional: custom tool implementations
-    ├── my_tool.yaml    # Tool descriptor (name, runtime, module, timeout)
-    └── my_tool.py      # Tool implementation (.py, .js, .wasm, ...)
+├── tools/              # Optional: custom tool implementations
+│   ├── my_tool.yaml    # Tool descriptor (name, runtime, module, timeout)
+│   └── my_tool.py      # Tool implementation (.py, .js, .wasm, ...)
+└── skills/             # Optional: SkillsMP skill packages (npx skills add ...)
+    └── <owner>/<repo>/<skill-name>/SKILL.md
 ```
 
 A `Runefile` combines all sections in one file:
@@ -197,6 +225,8 @@ default_model: default
 toolset:
   - rune@web-search       # built-in tool
   - my_custom_tool        # custom process tool
+skills:
+  - anthropics/claude-code/frontend-design   # injected into instructions at load time
 max_steps: 20
 timeout_ms: 60000
 

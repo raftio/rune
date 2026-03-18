@@ -21,6 +21,11 @@ pub struct AgentSpec {
     pub default_model: String,
     #[serde(default)]
     pub toolset: Vec<String>,
+    /// Skills from skills.sh to inject into the agent's instructions.
+    /// Format: `owner/repo/skill-name` (e.g. `anthropics/claude-code/frontend-design`).
+    /// Install locally with: `npx skills add owner/repo/skill-name`
+    #[serde(default)]
+    pub skills: Vec<String>,
     #[serde(default)]
     pub memory_profile: MemoryProfile,
     #[serde(default)]
@@ -169,5 +174,28 @@ toolset:
         let yaml = "name: [unclosed";
         let err: Result<AgentSpec, _> = serde_yaml::from_str(yaml);
         assert!(err.is_err());
+    }
+
+    #[test]
+    fn skills_default_is_empty() {
+        let spec: AgentSpec = serde_yaml::from_str(minimal_yaml()).unwrap();
+        assert!(spec.skills.is_empty());
+    }
+
+    #[test]
+    fn skills_parsed_correctly() {
+        let yaml = r#"
+name: a
+version: 0.1.0
+instructions: x
+default_model: d
+skills:
+  - anthropics/claude-code/frontend-design
+  - vercel-labs/agent-skills/find-skills
+"#;
+        let spec: AgentSpec = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(spec.skills.len(), 2);
+        assert_eq!(spec.skills[0], "anthropics/claude-code/frontend-design");
+        assert_eq!(spec.skills[1], "vercel-labs/agent-skills/find-skills");
     }
 }

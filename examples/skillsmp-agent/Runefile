@@ -1,0 +1,80 @@
+# SkillsMP integration example
+# Demonstrates two complementary ways to use skills from https://skillsmp.com
+#
+# --- Option A: Static skills (SKILL.md files) ---
+# Install skills locally, they are injected into the agent's instructions at load time.
+#
+#   npx skills add anthropics/claude-code/frontend-design
+#   npx skills add vercel-labs/agent-skills/find-skills
+#
+# Skills are stored at: skills/<owner>/<repo>/<skill-name>/SKILL.md
+#
+# --- Option B: SkillsMP MCP server (dynamic) ---
+# The agent can search, read, and install skills at runtime using the MCP tools:
+#   skillsmp/skillsmp_search          — keyword search across 66,500+ skills
+#   skillsmp/skillsmp_ai_search       — semantic / natural-language search
+#   skillsmp/skillsmp_get_skill_content — fetch a SKILL.md from GitHub
+#   skillsmp/skillsmp_list_repo_skills  — list skills in a repository
+#   skillsmp/skillsmp_install_skill     — install a skill to a local agent
+#
+# Start the MCP server in HTTP mode:
+#   SKILLSMP_API_KEY=<key> npx skillsmp-mcp-server --transport http --port 3010
+#
+# Get an API key at: https://skillsmp.com
+
+name: skillsmp-agent
+version: 0.1.0
+instructions: |
+  You are a capable assistant enhanced with agent skills from SkillsMP.
+
+  You have access to the SkillsMP marketplace via MCP tools (skillsmp/*).
+  When asked to find or use a skill:
+  1. Use skillsmp/skillsmp_ai_search to find relevant skills by natural language.
+  2. Use skillsmp/skillsmp_get_skill_content to read the SKILL.md content.
+  3. Apply the procedural knowledge from the skill in your response.
+
+  Static skills already injected into your context (see `skills:` below) do not
+  need to be fetched — use them directly.
+default_model: default
+toolset:
+  # SkillsMP MCP tools
+  - skillsmp/skillsmp_search
+  - skillsmp/skillsmp_ai_search
+  - skillsmp/skillsmp_get_skill_content
+  - skillsmp/skillsmp_list_repo_skills
+  - skillsmp/skillsmp_install_skill
+  # Built-in tools
+  - rune@memory-store
+  - rune@memory-recall
+
+# Static skills — injected into instructions at load time (Option A).
+# Install with: npx skills add <owner>/<repo>/<skill-name>
+skills:
+  - anthropics/claude-code/frontend-design
+  - vercel-labs/agent-skills/find-skills
+
+max_steps: 30
+timeout_ms: 60000
+
+# SkillsMP MCP server — enables dynamic skill discovery at runtime (Option B).
+# Start with: SKILLSMP_API_KEY=<key> npx skillsmp-mcp-server --transport http --port 3010
+mcp_servers:
+  - name: skillsmp
+    url: http://localhost:3010/mcp
+    headers:
+      Authorization: "Bearer ${SKILLSMP_API_KEY}"
+
+runtime:
+  concurrency_limit: 5
+  streaming_enabled: true
+  checkpoint_policy: on_finish
+  resource_profile: small
+
+models:
+  providers:
+    - anthropic
+    - openai
+  model_mapping:
+    default: claude-sonnet-4-6
+  fallback_policy: next_provider
+  token_budget: 150000
