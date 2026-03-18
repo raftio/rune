@@ -16,7 +16,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo
-        uses: Swatinem/rust-cache@2
+        uses: Swatinem/rust-cache@v2
 
       - name: Run tests
         run: cargo test --workspace
