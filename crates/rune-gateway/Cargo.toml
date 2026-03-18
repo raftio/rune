@@ -30,7 +30,6 @@ bytes = { workspace = true }
 async-trait = { workspace = true }
 tokio-stream = { workspace = true }
 rune-tools = { workspace = true }
-rune-channels = { workspace = true }
 jsonwebtoken = { workspace = true }
 metrics = { workspace = true }
 metrics-exporter-prometheus = { workspace = true }
