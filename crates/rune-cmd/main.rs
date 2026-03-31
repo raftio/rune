@@ -61,7 +61,9 @@ fn init_tracing(env: &PlatformEnv) -> Result<()> {
 }
 use clap::Parser;
 
-use cli::{AgentCommand, Cli, ClusterCommand, Command, ComposeCommand, DaemonCommand};
+use cli::{
+    AgentCommand, ArtifactCommand, Cli, ClusterCommand, Command, ComposeCommand, DaemonCommand,
+};
 
 
 #[tokio::main]
@@ -103,6 +105,10 @@ async fn main() -> Result<()> {
                 commands::cluster::change_membership(args).await?
             }
             ClusterCommand::Status(args) => commands::cluster::status(args).await?,
+        },
+        Command::Artifact { cmd } => match cmd {
+            ArtifactCommand::Build(args) => commands::artifact::build(args)?,
+            ArtifactCommand::Verify(args) => commands::artifact::verify_cmd(args)?,
         },
     }
 

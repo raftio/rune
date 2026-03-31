@@ -21,6 +21,9 @@ const SKILLSMP_PREFIX: &str = "https://skillsmp.com/";
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::thread;
 
     // --- stub ---
 
@@ -132,7 +135,7 @@ mod tests {
 
     #[test]
     fn github_skill_url_builds_correct_url() {
-        let url = github_skill_url("anthropics/claude-code/frontend-design").unwrap();
+        let url = github_skill_url_with_base("anthropics/claude-code/frontend-design", GITHUB_RAW_BASE).unwrap();
         assert_eq!(
             url,
             "https://raw.githubusercontent.com/anthropics/claude-code/HEAD/frontend-design/SKILL.md"
@@ -141,14 +144,30 @@ mod tests {
 
     #[test]
     fn github_skill_url_requires_three_segments() {
-        assert!(github_skill_url("owner/repo").is_none());
-        assert!(github_skill_url("just-one").is_none());
+        assert!(github_skill_url_with_base("owner/repo", GITHUB_RAW_BASE).is_none());
+        assert!(github_skill_url_with_base("just-one", GITHUB_RAW_BASE).is_none());
     }
 
     #[test]
     fn github_skill_url_skill_name_with_hyphens() {
-        let url = github_skill_url("vercel-labs/agent-skills/find-skills").unwrap();
+        let url = github_skill_url_with_base("vercel-labs/agent-skills/find-skills", GITHUB_RAW_BASE).unwrap();
         assert!(url.contains("/vercel-labs/agent-skills/HEAD/find-skills/SKILL.md"));
+    }
+
+    #[test]
+    fn fallback_skills_dir_url_inserts_skills_segment() {
+        let url = "https://raw.githubusercontent.com/vercel-labs/agent-skills/HEAD/find-skills/SKILL.md";
+        let fallback = fallback_skills_dir_url(url).unwrap();
+        assert_eq!(
+            fallback,
+            "https://raw.githubusercontent.com/vercel-labs/agent-skills/HEAD/skills/find-skills/SKILL.md"
+        );
+    }
+
+    #[test]
+    fn fallback_skills_dir_url_ignored_for_non_github_raw_or_existing_skills_path() {
+        assert!(fallback_skills_dir_url("https://example.com/a/b/c/SKILL.md").is_none());
+        assert!(fallback_skills_dir_url("https://raw.githubusercontent.com/vercel-labs/agent-skills/HEAD/skills/find-skills/SKILL.md").is_none());
     }
 
     // --- resolve_skill_url ---
@@ -235,6 +254,81 @@ mod tests {
 
         let plan = ExecutionPlan::from_dir(dir.path()).unwrap();
         assert_eq!(plan.agent_name, "runefile-agent");
+    }
+
+    fn start_mock_http_server(routes: Vec<(&'static str, u16, &'static str)>) -> (String, thread::JoinHandle<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handle = thread::spawn(move || {
+            for _ in 0..routes.len() {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut buf = [0u8; 4096];
+                let n = stream.read(&mut buf).unwrap_or(0);
+                let req = String::from_utf8_lossy(&buf[..n]);
+                let path = req
+                    .lines()
+                    .next()
+                    .and_then(|line| line.split_whitespace().nth(1))
+                    .unwrap_or("/");
+
+                let (status, body) = routes
+                    .iter()
+                    .find(|(p, _, _)| *p == path)
+                    .map(|(_, s, b)| (*s, *b))
+                    .unwrap_or((404, "not-found"));
+
+                let status_text = if status == 200 { "OK" } else { "Not Found" };
+                let resp = format!(
+                    "HTTP/1.1 {status} {status_text}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                    body.len(),
+                    body
+                );
+                let _ = stream.write_all(resp.as_bytes());
+            }
+        });
+        (format!("http://{addr}"), handle)
+    }
+
+    #[tokio::test]
+    async fn fetch_missing_skills_primary_url_success() {
+        let (base, handle) = start_mock_http_server(vec![("/owner/repo/HEAD/my-skill/SKILL.md", 200, "Remote skill content.")]);
+        let http = reqwest::Client::new();
+        let missing = vec!["owner/repo/my-skill".to_string()];
+
+        let content = fetch_missing_skills_with_base(&http, &missing, &base).await;
+        handle.join().unwrap();
+
+        assert_eq!(content, "Remote skill content.");
+    }
+
+    #[tokio::test]
+    async fn fetch_missing_skills_uses_fallback_skills_dir_on_primary_404() {
+        let (base, handle) = start_mock_http_server(vec![
+            ("/owner/repo/HEAD/my-skill/SKILL.md", 404, "not-found"),
+            ("/owner/repo/HEAD/skills/my-skill/SKILL.md", 200, "Fallback skill content."),
+        ]);
+        let http = reqwest::Client::new();
+        let missing = vec!["owner/repo/my-skill".to_string()];
+
+        let content = fetch_missing_skills_with_base(&http, &missing, &base).await;
+        handle.join().unwrap();
+
+        assert_eq!(content, "Fallback skill content.");
+    }
+
+    #[tokio::test]
+    async fn fetch_missing_skills_keeps_empty_when_primary_and_fallback_fail() {
+        let (base, handle) = start_mock_http_server(vec![
+            ("/owner/repo/HEAD/my-skill/SKILL.md", 404, "not-found"),
+            ("/owner/repo/HEAD/skills/my-skill/SKILL.md", 404, "not-found"),
+        ]);
+        let http = reqwest::Client::new();
+        let missing = vec!["owner/repo/my-skill".to_string()];
+
+        let content = fetch_missing_skills_with_base(&http, &missing, &base).await;
+        handle.join().unwrap();
+
+        assert!(content.is_empty());
     }
 }
 
@@ -377,6 +471,81 @@ async fn fetch_missing_skills(http: &reqwest::Client, missing: &[String]) -> Str
                         }
                     }
                     Ok(resp) => {
+                        if resp.status().as_u16() == 404 {
+                            if let Some(fallback_url) = fallback_skills_dir_url(&url) {
+                                match http.get(&fallback_url).send().await {
+                                    Ok(fallback_resp) if fallback_resp.status().is_success() => {
+                                        match fallback_resp.text().await {
+                                            Ok(text) => {
+                                                parts.push(text.trim().to_string());
+                                                continue;
+                                            }
+                                            Err(e) => {
+                                                warn!(
+                                                    "Failed to read fallback skill body for '{skill_ref}': {e}"
+                                                );
+                                            }
+                                        }
+                                    }
+                                    Ok(_) => {}
+                                    Err(_) => {}
+                                }
+                            }
+                        }
+                        warn!("Skill '{skill_ref}' not found remotely (HTTP {})", resp.status());
+                    }
+                    Err(e) => {
+                        warn!("Failed to fetch skill '{skill_ref}' from {url}: {e}");
+                    }
+                }
+            }
+            None => {
+                warn!("Cannot resolve skill ref '{skill_ref}': unsupported format, skipping remote fetch");
+            }
+        }
+    }
+    parts.join("\n\n")
+}
+
+#[cfg(test)]
+async fn fetch_missing_skills_with_base(
+    http: &reqwest::Client,
+    missing: &[String],
+    github_raw_base: &str,
+) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    for skill_ref in missing {
+        match resolve_skill_url_with_base(skill_ref, github_raw_base) {
+            Some(url) => {
+                match http.get(&url).send().await {
+                    Ok(resp) if resp.status().is_success() => {
+                        match resp.text().await {
+                            Ok(text) => parts.push(text.trim().to_string()),
+                            Err(e) => warn!("Failed to read skill body for '{skill_ref}': {e}"),
+                        }
+                    }
+                    Ok(resp) => {
+                        if resp.status().as_u16() == 404 {
+                            if let Some(fallback_url) = fallback_skills_dir_url_with_base(&url, github_raw_base) {
+                                match http.get(&fallback_url).send().await {
+                                    Ok(fallback_resp) if fallback_resp.status().is_success() => {
+                                        match fallback_resp.text().await {
+                                            Ok(text) => {
+                                                parts.push(text.trim().to_string());
+                                                continue;
+                                            }
+                                            Err(e) => {
+                                                warn!(
+                                                    "Failed to read fallback skill body for '{skill_ref}': {e}"
+                                                );
+                                            }
+                                        }
+                                    }
+                                    Ok(_) => {}
+                                    Err(_) => {}
+                                }
+                            }
+                        }
                         warn!("Skill '{skill_ref}' not found remotely (HTTP {})", resp.status());
                     }
                     Err(e) => {
@@ -404,30 +573,45 @@ async fn fetch_missing_skills(http: &reqwest::Client, missing: &[String]) -> Str
 /// Returns `None` when the short `owner/repo/skill-name` format is used but the
 /// ref doesn't have exactly three `/`-separated segments.
 fn resolve_skill_url(skill_ref: &str) -> Option<String> {
+    resolve_skill_url_with_base(skill_ref, GITHUB_RAW_BASE)
+}
+
+fn resolve_skill_url_with_base(skill_ref: &str, github_raw_base: &str) -> Option<String> {
     if let Some(path) = skill_ref.strip_prefix(SKILLS_SH_PREFIX) {
         // https://skills.sh/<owner>/<repo>/<skill-name>
-        github_skill_url(path)
+        github_skill_url_with_base(path, github_raw_base)
     } else if let Some(path) = skill_ref.strip_prefix(SKILLSMP_PREFIX) {
         // https://skillsmp.com/<owner>/<repo>/<skill-name>
-        github_skill_url(path)
+        github_skill_url_with_base(path, github_raw_base)
     } else if skill_ref.starts_with("https://") {
         // Generic URL — caller knows the exact location of the SKILL.md file.
         Some(skill_ref.to_string())
     } else {
         // Short form: owner/repo/skill-name
-        github_skill_url(skill_ref)
+        github_skill_url_with_base(skill_ref, github_raw_base)
     }
 }
 
-/// Build a GitHub raw content URL for a skill ref `owner/repo/skill-name`.
-/// Returns `None` if the ref doesn't have exactly three path segments.
-fn github_skill_url(skill_ref: &str) -> Option<String> {
+fn github_skill_url_with_base(skill_ref: &str, github_raw_base: &str) -> Option<String> {
     let parts: Vec<&str> = skill_ref.splitn(3, '/').collect();
     if parts.len() != 3 {
         return None;
     }
     let (owner, repo, skill_name) = (parts[0], parts[1], parts[2]);
-    Some(format!(
-        "{GITHUB_RAW_BASE}/{owner}/{repo}/HEAD/{skill_name}/SKILL.md"
-    ))
+    Some(format!("{github_raw_base}/{owner}/{repo}/HEAD/{skill_name}/SKILL.md"))
+}
+
+fn fallback_skills_dir_url(url: &str) -> Option<String> {
+    fallback_skills_dir_url_with_base(url, GITHUB_RAW_BASE)
+}
+
+fn fallback_skills_dir_url_with_base(url: &str, github_raw_base: &str) -> Option<String> {
+    let skill_suffix = "/SKILL.md";
+    if !url.starts_with(github_raw_base) || !url.ends_with(skill_suffix) || url.contains("/skills/") {
+        return None;
+    }
+    let head_idx = url.find("/HEAD/")?;
+    let before = &url[..head_idx + "/HEAD/".len()];
+    let after = &url[head_idx + "/HEAD/".len()..];
+    Some(format!("{before}skills/{after}"))
 }

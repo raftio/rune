@@ -24,6 +24,7 @@
 - [CLI Reference](reference/cli.md) — All `rune` commands
 - [HTTP API](reference/api.md) — Gateway endpoints
 - [Architecture](architecture/overview.md) — System design and crate map
+- [Open Agent Initiative](concepts/open-agent-initiative.md) — OAI white paper: portable agent artifacts vs OCI containers
 
 ## Project Layout
 

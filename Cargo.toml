@@ -14,6 +14,7 @@ members = [
     "crates/rune-backend/rune-docker",
     "crates/rune-env",
     "crates/rune-tools",
+    "crates/rune-artifact",
     "crates/rune-cmd",
     "e2e",
 ]
@@ -89,6 +90,7 @@ tar = { version = "0.4" }
 flate2 = { version = "1" }
 walkdir = { version = "2" }
 hex = { version = "0.4" }
+sha2 = { version = "0.10" }
 
 # Object storage
 object_store = { version = "0.10" }
@@ -115,5 +117,6 @@ rune-cp = { path = "crates/rune-cp" }
 rune-gateway = { path = "crates/rune-gateway" }
 rune-env = { path = "crates/rune-env" }
 rune-tools = { path = "crates/rune-tools" }
+rune-artifact = { path = "crates/rune-artifact" }
 rune-wasm-backend = { path = "crates/rune-backend/rune-wasm" }
 rune-docker-backend = { path = "crates/rune-backend/rune-docker" }

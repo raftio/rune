@@ -54,11 +54,11 @@ pub fn resolve_agent_source(
 // Runtime management helpers
 // ---------------------------------------------------------------------------
 
-/// Fetch all deployments enriched with their agent name.
-async fn fetch_named_deployments(
+/// Raw control-plane lists (deployments JSON rows, agent-version JSON rows).
+async fn fetch_control_plane_state(
     http: &reqwest::Client,
     base: &str,
-) -> Result<Vec<(String, serde_json::Value)>> {
+) -> Result<(Vec<serde_json::Value>, Vec<serde_json::Value>)> {
     let body: serde_json::Value = http
         .get(format!("{base}/v1/deployments"))
         .send()
@@ -69,7 +69,7 @@ async fn fetch_named_deployments(
 
     let deployments = body["deployments"].as_array().cloned().unwrap_or_default();
 
-    let versions: serde_json::Value = http
+    let versions_value: serde_json::Value = http
         .get(format!("{base}/v1/agent-versions"))
         .send()
         .await?
@@ -77,21 +77,47 @@ async fn fetch_named_deployments(
         .await
         .unwrap_or_default();
 
-    let result = deployments
+    let versions = versions_value
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+
+    Ok((deployments, versions))
+}
+
+fn attach_agent_names(
+    deployments: Vec<serde_json::Value>,
+    versions: &[serde_json::Value],
+) -> Vec<(String, serde_json::Value)> {
+    deployments
         .into_iter()
         .map(|d| {
             let vid = d["agent_version_id"].as_str().unwrap_or("");
-            let name = versions
-                .as_array()
-                .and_then(|arr| arr.iter().find(|v| v["id"].as_str() == Some(vid)))
+            let name = find_agent_version(versions, vid)
                 .and_then(|v| v["agent_name"].as_str())
                 .unwrap_or("unknown")
                 .to_string();
             (name, d)
         })
-        .collect();
+        .collect()
+}
 
-    Ok(result)
+fn find_agent_version<'a>(
+    versions: &'a [serde_json::Value],
+    agent_version_id: &str,
+) -> Option<&'a serde_json::Value> {
+    versions
+        .iter()
+        .find(|v| v["id"].as_str() == Some(agent_version_id))
+}
+
+/// Fetch all deployments enriched with their agent name.
+async fn fetch_named_deployments(
+    http: &reqwest::Client,
+    base: &str,
+) -> Result<Vec<(String, serde_json::Value)>> {
+    let (deployments, versions) = fetch_control_plane_state(http, base).await?;
+    Ok(attach_agent_names(deployments, &versions))
 }
 
 pub async fn ls(args: AgentLsArgs) -> Result<()> {
@@ -121,7 +147,8 @@ pub async fn ls(args: AgentLsArgs) -> Result<()> {
 pub async fn inspect(args: AgentInspectArgs) -> Result<()> {
     let http = reqwest::Client::new();
     let base = args.control_plane.trim_end_matches('/');
-    let rows = fetch_named_deployments(&http, base).await?;
+    let (deployments, versions) = fetch_control_plane_state(&http, base).await?;
+    let rows = attach_agent_names(deployments, &versions);
 
     let matches: Vec<_> = rows
         .iter()
@@ -161,6 +188,94 @@ pub async fn inspect(args: AgentInspectArgs) -> Result<()> {
         println!("Concurrency: {concurrency}");
         println!("Created:     {}", &created[..19.min(created.len())]);
         println!("ID:          {id}");
+
+        let vid = d["agent_version_id"].as_str().unwrap_or("");
+        if let Some(v) = find_agent_version(&versions, vid) {
+            let ver = v["version"].as_str().unwrap_or("?");
+            let spec_sha = v["spec_sha256"].as_str().unwrap_or("?");
+            let image_ref = v["image_ref"].as_str().unwrap_or("?");
+            let image_digest = v["image_digest"].as_str().unwrap_or("?");
+            let digest_short = if image_digest.len() > 12 {
+                format!("{}…", &image_digest[..12])
+            } else {
+                image_digest.to_string()
+            };
+            let runtime_class = v["runtime_class"].as_str().unwrap_or("?");
+            let vstatus = v["status"].as_str().unwrap_or("?");
+            let vcreated = v["created_at"].as_str().unwrap_or("?");
+            let vid_row = v["id"].as_str().unwrap_or("?");
+            println!();
+            println!("Registry / agent-version:");
+            println!("  Version ID:   {vid_row}");
+            println!("  Version:      {ver}");
+            println!("  Spec SHA256:  {spec_sha}");
+            println!("  Image:        {image_ref} ({digest_short})");
+            println!("  Runtime:      {runtime_class}");
+            println!("  Ver. status:  {vstatus}");
+            println!(
+                "  Registered:   {}",
+                &vcreated[..19.min(vcreated.len())]
+            );
+        } else {
+            println!();
+            println!("Registry / agent-version:");
+            println!("  (no matching agent_version_id '{vid}' in /v1/agent-versions)");
+        }
+    }
+
+    if let Some(ref dir) = args.agent_dir {
+        println!();
+        let spec_str = dir.to_string_lossy();
+        match resolve_agent_source(&spec_str) {
+            Ok((_tmp, pkg)) => {
+                if pkg.spec.name != args.name {
+                    eprintln!(
+                        "warning: Runefile name '{}' does not match inspect target '{}'",
+                        pkg.spec.name, args.name
+                    );
+                }
+                println!("Local Runefile ({})", dir.display());
+                if pkg.spec.skills.is_empty() {
+                    println!("  skills:       (none)");
+                } else {
+                    println!("  skills:");
+                    for s in &pkg.spec.skills {
+                        println!("    - {s}");
+                    }
+                }
+                if pkg.spec.toolset.is_empty() {
+                    println!("  toolset:      (none)");
+                } else {
+                    println!("  toolset:");
+                    let max_tools = 50;
+                    for (i, t) in pkg.spec.toolset.iter().enumerate() {
+                        if i >= max_tools {
+                            println!("    … and {} more", pkg.spec.toolset.len() - max_tools);
+                            break;
+                        }
+                        println!("    - {t}");
+                    }
+                }
+                let instr = pkg.spec.instructions.trim();
+                let excerpt_len = 500usize;
+                if instr.len() <= excerpt_len {
+                    println!("  instructions:");
+                    for line in instr.lines() {
+                        println!("    {line}");
+                    }
+                } else {
+                    let excerpt = &instr[..excerpt_len];
+                    println!("  instructions (excerpt):");
+                    for line in excerpt.lines() {
+                        println!("    {line}");
+                    }
+                    println!("    …");
+                }
+            }
+            Err(e) => {
+                eprintln!("warning: could not load --agent-dir: {e}");
+            }
+        }
     }
 
     Ok(())
@@ -351,5 +466,31 @@ pub async fn rm_by_name(args: AgentRmArgs) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod inspect_tests {
+    use super::{attach_agent_names, find_agent_version};
+    use serde_json::json;
+
+    #[test]
+    fn find_agent_version_matches_id() {
+        let versions = vec![
+            json!({"id": "a", "agent_name": "n1"}),
+            json!({"id": "b", "version": "0.1.0", "spec_sha256": "abc"}),
+        ];
+        let v = find_agent_version(&versions, "b").unwrap();
+        assert_eq!(v["version"], "0.1.0");
+        assert!(find_agent_version(&versions, "missing").is_none());
+    }
+
+    #[test]
+    fn attach_agent_names_maps_deployments() {
+        let versions = vec![json!({"id": "vid-1", "agent_name": "chat"})];
+        let depls = vec![json!({"agent_version_id": "vid-1", "namespace": "dev"})];
+        let rows = attach_agent_names(depls, &versions);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].0, "chat");
+    }
 }
 
