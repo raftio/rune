@@ -397,4 +397,54 @@ steps:
         let err = WorkflowSpec::parse("not: valid: yaml: [", "test.yaml").unwrap_err();
         assert!(err.to_string().contains("Parse error"));
     }
+
+    #[test]
+    fn step_condition_and_timeout_default_to_none() {
+        let spec = WorkflowSpec::parse(simple_workflow_yaml(), "test").unwrap();
+        assert!(spec.steps[0].condition.is_none());
+        assert!(spec.steps[0].timeout_ms.is_none());
+    }
+
+    #[test]
+    fn step_with_full_url_agent_ref() {
+        let yaml = r#"
+name: w
+version: 0.1.0
+steps:
+  - id: remote
+    agent_ref: http://agent-host:8080/a2a/my-agent
+"#;
+        let spec = WorkflowSpec::parse(yaml, "test").unwrap();
+        assert_eq!(spec.steps[0].agent_ref, "http://agent-host:8080/a2a/my-agent");
+    }
+
+    #[test]
+    fn step_input_template_custom() {
+        let yaml = r#"
+name: w
+version: 0.1.0
+steps:
+  - id: step1
+    agent_ref: local://a
+    input_template: "Summarize: {{ input }}"
+"#;
+        let spec = WorkflowSpec::parse(yaml, "test").unwrap();
+        assert_eq!(spec.steps[0].input_template, "Summarize: {{ input }}");
+    }
+
+    #[test]
+    fn load_from_file_roundtrip() {
+        let file = tempfile::NamedTempFile::with_suffix(".yaml").unwrap();
+        std::fs::write(file.path(), simple_workflow_yaml()).unwrap();
+        let spec = WorkflowSpec::load(file.path()).unwrap();
+        assert_eq!(spec.name, "pipeline");
+        assert_eq!(spec.steps.len(), 2);
+    }
+
+    #[test]
+    fn parse_source_name_appears_in_parse_error() {
+        let err = WorkflowSpec::parse("not: valid: [", "my-workflow.yaml").unwrap_err();
+        assert!(err.to_string().contains("Parse error"));
+        assert!(err.to_string().contains("my-workflow.yaml"));
+    }
 }

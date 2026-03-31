@@ -128,6 +128,118 @@ mod tests {
     }
 
     #[test]
+    fn load_skills_url_format_goes_to_missing_skills() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("Runefile"),
+            "name: a\nversion: 0.1.0\ninstructions: Base.\ndefault_model: d\nruntime: {}\nmodels: {}\nskills:\n  - https://skills.sh/owner/repo/my-skill\n  - https://skillsmp.com/vercel-labs/agent-skills/find-skills\n",
+        )
+        .unwrap();
+
+        let pkg = AgentPackage::load(dir.path()).unwrap();
+        assert!(pkg.skill_instructions.is_empty());
+        assert_eq!(pkg.missing_skills.len(), 2);
+        assert!(pkg.missing_skills.contains(&"https://skills.sh/owner/repo/my-skill".to_string()));
+        assert!(pkg.missing_skills.contains(&"https://skillsmp.com/vercel-labs/agent-skills/find-skills".to_string()));
+    }
+
+    #[test]
+    fn load_skills_generic_https_url_goes_to_missing_skills() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("Runefile"),
+            "name: a\nversion: 0.1.0\ninstructions: Base.\ndefault_model: d\nruntime: {}\nmodels: {}\nskills:\n  - https://example.com/path/to/SKILL.md\n",
+        )
+        .unwrap();
+
+        let pkg = AgentPackage::load(dir.path()).unwrap();
+        assert!(pkg.skill_instructions.is_empty());
+        assert_eq!(pkg.missing_skills, vec!["https://example.com/path/to/SKILL.md"]);
+    }
+
+    #[test]
+    fn load_skills_mix_of_local_and_url_refs() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("Runefile"),
+            "name: a\nversion: 0.1.0\ninstructions: Base.\ndefault_model: d\nruntime: {}\nmodels: {}\nskills:\n  - owner/repo/local-skill\n  - https://skills.sh/owner/repo/remote-skill\n",
+        )
+        .unwrap();
+
+        let skill_dir = dir.path().join("skills/owner/repo/local-skill");
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        std::fs::write(skill_dir.join("SKILL.md"), "Local content.").unwrap();
+
+        let pkg = AgentPackage::load(dir.path()).unwrap();
+        assert!(pkg.skill_instructions.contains("Local content."));
+        assert_eq!(pkg.missing_skills, vec!["https://skills.sh/owner/repo/remote-skill"]);
+    }
+
+    #[test]
+    fn load_builtin_tools_auto_injected_for_rune_at_toolset() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("Runefile"),
+            "name: a\nversion: 0.1.0\ninstructions: x\ndefault_model: d\nruntime: {}\nmodels: {}\ntoolset:\n  - rune@memory-store\n  - rune@memory-recall\n",
+        )
+        .unwrap();
+
+        let pkg = AgentPackage::load(dir.path()).unwrap();
+        let tool_names: Vec<&str> = pkg.tools.iter().map(|t| t.name.as_str()).collect();
+        assert!(tool_names.contains(&"rune@memory-store"));
+        assert!(tool_names.contains(&"rune@memory-recall"));
+        // Auto-injected descriptors are marked as builtin
+        assert!(pkg.tools.iter().all(|t| t.is_builtin()));
+    }
+
+    #[test]
+    fn load_invalid_workflow_returns_error() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("Runefile"),
+            "name: a\nversion: 0.1.0\ninstructions: x\ndefault_model: d\nruntime: {}\nmodels: {}\n",
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("workflow.yaml"), "not: valid: yaml: [").unwrap();
+
+        let result = AgentPackage::load(dir.path());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn load_invalid_tool_yaml_returns_error() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("Runefile"),
+            "name: a\nversion: 0.1.0\ninstructions: x\ndefault_model: d\nruntime: {}\nmodels: {}\n",
+        )
+        .unwrap();
+        let tools_dir = dir.path().join("tools");
+        std::fs::create_dir(&tools_dir).unwrap();
+        std::fs::write(tools_dir.join("bad.yaml"), "name: [unclosed").unwrap();
+
+        let result = AgentPackage::load(dir.path());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn load_tools_dir_with_valid_tool_loaded() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("Runefile"),
+            "name: a\nversion: 0.1.0\ninstructions: x\ndefault_model: d\nruntime: {}\nmodels: {}\ntoolset:\n  - my_search\n",
+        )
+        .unwrap();
+        let tools_dir = dir.path().join("tools");
+        std::fs::create_dir(&tools_dir).unwrap();
+        std::fs::write(tools_dir.join("search.yaml"), "name: my_search\n").unwrap();
+
+        let pkg = AgentPackage::load(dir.path()).unwrap();
+        assert!(pkg.tools.iter().any(|t| t.name == "my_search"));
+        assert!(pkg.spec.toolset.contains(&"my_search".to_string()));
+    }
+
+    #[test]
     fn load_skills_multiple_skills_are_joined() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(
@@ -152,6 +264,10 @@ mod tests {
 /// Skills are expected at `skills/<owner>/<repo>/<skill-name>/SKILL.md` relative
 /// to the agent directory, matching the layout produced by `npx skills add`.
 ///
+/// URL-format refs (`https://skills.sh/…`, `https://skillsmp.com/…`, or any
+/// `https://` URL) are skipped for local lookup and added directly to
+/// `missing_refs` so the runtime can fetch them remotely.
+///
 /// Returns `(found_content, missing_refs)`:
 /// - `found_content`: concatenated content of all locally resolved skills
 /// - `missing_refs`: skill refs not found locally — the runtime can fetch these remotely
@@ -160,6 +276,11 @@ fn load_skills(agent_dir: &Path, skills: &[String]) -> (String, Vec<String>) {
     let mut parts: Vec<String> = Vec::new();
     let mut missing: Vec<String> = Vec::new();
     for skill_ref in skills {
+        // URL-format refs have no local representation — defer to remote fetch.
+        if skill_ref.starts_with("https://") {
+            missing.push(skill_ref.clone());
+            continue;
+        }
         let skill_path = skills_dir.join(skill_ref).join("SKILL.md");
         match std::fs::read_to_string(&skill_path) {
             Ok(content) => parts.push(content.trim().to_string()),

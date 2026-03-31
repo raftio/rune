@@ -420,6 +420,117 @@ agents:
     }
 
     #[test]
+    fn version_custom_value_parsed() {
+        let yaml = "version: \"2\"\nproject: p\nagents:\n  a:\n    source: ./a\n";
+        let spec = ComposeSpec::parse(yaml, "test").unwrap();
+        assert_eq!(spec.version, "2");
+    }
+
+    #[test]
+    fn version_default_is_one() {
+        let spec = ComposeSpec::parse(valid_yaml(), "test").unwrap();
+        assert_eq!(spec.version, "1");
+    }
+
+    // --- agent name validation ---
+
+    #[test]
+    fn agent_name_exactly_63_chars_is_valid() {
+        let name = "a".repeat(63);
+        let yaml = format!("project: p\nagents:\n  {name}:\n    source: ./x\n");
+        let spec = ComposeSpec::parse(&yaml, "test").unwrap();
+        assert!(spec.agents.contains_key(&name));
+    }
+
+    #[test]
+    fn agent_name_64_chars_is_rejected() {
+        let name = "a".repeat(64);
+        let yaml = format!("project: p\nagents:\n  {name}:\n    source: ./x\n");
+        let err = ComposeSpec::parse(&yaml, "test").unwrap_err();
+        assert!(err.to_string().contains("1-63 characters"));
+    }
+
+    #[test]
+    fn agent_name_with_uppercase_is_rejected() {
+        let yaml = "project: p\nagents:\n  MyAgent:\n    source: ./x\n";
+        let err = ComposeSpec::parse(yaml, "test").unwrap_err();
+        assert!(err.to_string().contains("lowercase"));
+    }
+
+    #[test]
+    fn agent_name_with_underscore_is_rejected() {
+        let yaml = "project: p\nagents:\n  my_agent:\n    source: ./x\n";
+        let err = ComposeSpec::parse(yaml, "test").unwrap_err();
+        assert!(err.to_string().contains("lowercase"));
+    }
+
+    #[test]
+    fn agent_name_ending_with_dash_is_rejected() {
+        let yaml = "project: p\nagents:\n  agent-:\n    source: ./x\n";
+        let err = ComposeSpec::parse(yaml, "test").unwrap_err();
+        assert!(err.to_string().contains("must start and end with"));
+    }
+
+    #[test]
+    fn agent_name_with_digits_is_valid() {
+        let yaml = "project: p\nagents:\n  agent-v2:\n    source: ./x\n";
+        let spec = ComposeSpec::parse(yaml, "test").unwrap();
+        assert!(spec.agents.contains_key("agent-v2"));
+    }
+
+    #[test]
+    fn agent_name_single_char_is_valid() {
+        let yaml = "project: p\nagents:\n  a:\n    source: ./a\n";
+        let spec = ComposeSpec::parse(yaml, "test").unwrap();
+        assert!(spec.agents.contains_key("a"));
+    }
+
+    // --- resolved_env ---
+
+    #[test]
+    fn resolved_env_unknown_agent_returns_global_env_only() {
+        let yaml = r#"
+project: p
+rune-env:
+  GLOBAL_KEY: global
+agents:
+  a:
+    source: ./a
+    env:
+      AGENT_KEY: val
+"#;
+        let spec = ComposeSpec::parse(yaml, "test").unwrap();
+        // Non-existent agent: only global rune-env returned, no agent-level env
+        let env = spec.resolved_env("nonexistent");
+        assert_eq!(env.get("GLOBAL_KEY").map(|s| s.as_str()), Some("global"));
+        assert!(!env.contains_key("AGENT_KEY"));
+    }
+
+    #[test]
+    fn resolved_env_agent_key_overrides_global() {
+        let yaml = r#"
+project: p
+rune-env:
+  KEY: base
+agents:
+  a:
+    source: ./a
+    env:
+      KEY: override
+"#;
+        let spec = ComposeSpec::parse(yaml, "test").unwrap();
+        let env = spec.resolved_env("a");
+        assert_eq!(env["KEY"], "override");
+    }
+
+    #[test]
+    fn replicas_zero_is_accepted() {
+        let yaml = "project: p\nagents:\n  a:\n    source: ./a\n    replicas: 0\n";
+        let spec = ComposeSpec::parse(yaml, "test").unwrap();
+        assert_eq!(spec.agents["a"].replicas, 0);
+    }
+
+    #[test]
     fn preserves_insertion_order() {
         let yaml = r#"
 project: ordered

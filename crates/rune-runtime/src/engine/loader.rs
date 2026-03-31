@@ -9,6 +9,15 @@ use crate::error::RuntimeError;
 /// Pattern: `{BASE}/{owner}/{repo}/HEAD/{skill_name}/SKILL.md`
 const GITHUB_RAW_BASE: &str = "https://raw.githubusercontent.com";
 
+/// skills.sh URL prefix. Skills hosted here are stored on GitHub and resolved
+/// via [`GITHUB_RAW_BASE`] using the `owner/repo/skill-name` path segment.
+const SKILLS_SH_PREFIX: &str = "https://skills.sh/";
+
+/// SkillsMP URL prefix. Skills published on the SkillsMP marketplace are stored
+/// on GitHub and resolved via [`GITHUB_RAW_BASE`] using the `owner/repo/skill-name`
+/// path segment.
+const SKILLSMP_PREFIX: &str = "https://skillsmp.com/";
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -140,6 +149,59 @@ mod tests {
     fn github_skill_url_skill_name_with_hyphens() {
         let url = github_skill_url("vercel-labs/agent-skills/find-skills").unwrap();
         assert!(url.contains("/vercel-labs/agent-skills/HEAD/find-skills/SKILL.md"));
+    }
+
+    // --- resolve_skill_url ---
+
+    #[test]
+    fn resolve_skill_url_short_form_uses_github() {
+        let url = resolve_skill_url("anthropics/claude-code/frontend-design").unwrap();
+        assert_eq!(
+            url,
+            "https://raw.githubusercontent.com/anthropics/claude-code/HEAD/frontend-design/SKILL.md"
+        );
+    }
+
+    #[test]
+    fn resolve_skill_url_skills_sh_prefix_uses_github() {
+        let url = resolve_skill_url("https://skills.sh/anthropics/claude-code/frontend-design").unwrap();
+        assert_eq!(
+            url,
+            "https://raw.githubusercontent.com/anthropics/claude-code/HEAD/frontend-design/SKILL.md"
+        );
+    }
+
+    #[test]
+    fn resolve_skill_url_skillsmp_prefix_uses_github() {
+        let url = resolve_skill_url("https://skillsmp.com/vercel-labs/agent-skills/find-skills").unwrap();
+        assert_eq!(
+            url,
+            "https://raw.githubusercontent.com/vercel-labs/agent-skills/HEAD/find-skills/SKILL.md"
+        );
+    }
+
+    #[test]
+    fn resolve_skill_url_generic_https_returned_as_is() {
+        let raw = "https://example.com/my-org/my-repo/my-skill/SKILL.md";
+        let url = resolve_skill_url(raw).unwrap();
+        assert_eq!(url, raw);
+    }
+
+    #[test]
+    fn resolve_skill_url_short_form_missing_segments_returns_none() {
+        assert!(resolve_skill_url("owner/repo").is_none());
+        assert!(resolve_skill_url("just-one").is_none());
+    }
+
+    #[test]
+    fn resolve_skill_url_skills_sh_missing_segments_returns_none() {
+        // https://skills.sh/owner/repo — missing skill-name segment
+        assert!(resolve_skill_url("https://skills.sh/owner/repo").is_none());
+    }
+
+    #[test]
+    fn resolve_skill_url_skillsmp_missing_segments_returns_none() {
+        assert!(resolve_skill_url("https://skillsmp.com/owner/repo").is_none());
     }
 
     // --- from_dir_async: local skills still work ---
@@ -295,15 +357,17 @@ impl ExecutionPlan {
 
 /// Fetch SKILL.md content for skills not found locally.
 ///
-/// Each `skill_ref` is expected in `owner/repo/skill-name` format.
-/// The file is retrieved from:
-///   `https://raw.githubusercontent.com/<owner>/<repo>/HEAD/<skill-name>/SKILL.md`
+/// Supported `skill_ref` formats:
+/// - `owner/repo/skill-name` — fetched from GitHub raw content
+/// - `https://skills.sh/<owner>/<repo>/<skill-name>` — path extracted and fetched from GitHub
+/// - `https://skillsmp.com/<owner>/<repo>/<skill-name>` — path extracted and fetched from GitHub
+/// - Any other `https://` URL — fetched directly (the URL is used as-is)
 ///
 /// Failures (network, 404, etc.) are logged and skipped.
 async fn fetch_missing_skills(http: &reqwest::Client, missing: &[String]) -> String {
     let mut parts: Vec<String> = Vec::new();
     for skill_ref in missing {
-        match github_skill_url(skill_ref) {
+        match resolve_skill_url(skill_ref) {
             Some(url) => {
                 match http.get(&url).send().await {
                     Ok(resp) if resp.status().is_success() => {
@@ -321,11 +385,38 @@ async fn fetch_missing_skills(http: &reqwest::Client, missing: &[String]) -> Str
                 }
             }
             None => {
-                warn!("Skill ref '{skill_ref}' is not in 'owner/repo/skill-name' format, skipping remote fetch");
+                warn!("Cannot resolve skill ref '{skill_ref}': unsupported format, skipping remote fetch");
             }
         }
     }
     parts.join("\n\n")
+}
+
+/// Resolve a skill ref to the URL from which SKILL.md should be fetched.
+///
+/// | Input format | Resolution |
+/// |---|---|
+/// | `owner/repo/skill-name` | GitHub raw content URL |
+/// | `https://skills.sh/<owner>/<repo>/<skill-name>` | GitHub raw content URL (path extracted) |
+/// | `https://skillsmp.com/<owner>/<repo>/<skill-name>` | GitHub raw content URL (path extracted) |
+/// | any other `https://` URL | returned as-is |
+///
+/// Returns `None` when the short `owner/repo/skill-name` format is used but the
+/// ref doesn't have exactly three `/`-separated segments.
+fn resolve_skill_url(skill_ref: &str) -> Option<String> {
+    if let Some(path) = skill_ref.strip_prefix(SKILLS_SH_PREFIX) {
+        // https://skills.sh/<owner>/<repo>/<skill-name>
+        github_skill_url(path)
+    } else if let Some(path) = skill_ref.strip_prefix(SKILLSMP_PREFIX) {
+        // https://skillsmp.com/<owner>/<repo>/<skill-name>
+        github_skill_url(path)
+    } else if skill_ref.starts_with("https://") {
+        // Generic URL — caller knows the exact location of the SKILL.md file.
+        Some(skill_ref.to_string())
+    } else {
+        // Short form: owner/repo/skill-name
+        github_skill_url(skill_ref)
+    }
 }
 
 /// Build a GitHub raw content URL for a skill ref `owner/repo/skill-name`.

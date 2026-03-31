@@ -121,4 +121,69 @@ models:
         let err = Runefile::load(file.path()).unwrap_err();
         assert!(err.to_string().contains("Parse error"));
     }
+
+    #[test]
+    fn minimal_runtime_empty_map_uses_defaults() {
+        let yaml = "name: a\nversion: 0.1.0\ninstructions: x\ndefault_model: d\nruntime: {}\nmodels: {}\n";
+        let rf: Runefile = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(rf.runtime.concurrency_limit, 10);
+        assert_eq!(rf.runtime.health_probe.path, "/health");
+        assert!(rf.runtime.streaming_enabled);
+        assert!(rf.models.providers.is_empty());
+        assert_eq!(rf.models.token_budget, 100_000);
+    }
+
+    #[test]
+    fn runefile_with_skills_field() {
+        let yaml = r#"
+name: a
+version: 0.1.0
+instructions: x
+default_model: d
+runtime: {}
+models: {}
+skills:
+  - anthropics/claude-code/frontend-design
+  - https://skills.sh/vercel-labs/agent-skills/find-skills
+"#;
+        let rf: Runefile = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(rf.spec.skills.len(), 2);
+        assert_eq!(rf.spec.skills[0], "anthropics/claude-code/frontend-design");
+        assert_eq!(rf.spec.skills[1], "https://skills.sh/vercel-labs/agent-skills/find-skills");
+    }
+
+    #[test]
+    fn runefile_with_mcp_servers() {
+        let yaml = r#"
+name: a
+version: 0.1.0
+instructions: x
+default_model: d
+runtime: {}
+models: {}
+mcp_servers:
+  - name: search
+    url: http://localhost:3001/mcp
+"#;
+        let rf: Runefile = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(rf.spec.mcp_servers.len(), 1);
+        assert_eq!(rf.spec.mcp_servers[0].name, "search");
+    }
+
+    #[test]
+    fn runefile_networks_field() {
+        let yaml = r#"
+name: a
+version: 0.1.0
+instructions: x
+default_model: d
+runtime: {}
+models: {}
+networks:
+  - bridge
+  - internal
+"#;
+        let rf: Runefile = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(rf.spec.networks, vec!["bridge", "internal"]);
+    }
 }
