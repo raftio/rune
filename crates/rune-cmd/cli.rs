@@ -198,16 +198,12 @@ pub struct StartArgs {
     /// Execution backend for agent replicas
     #[arg(long, default_value = "wasm")]
     pub backend: BackendChoice,
-    /// Kubernetes namespace (only used when --backend=kubernetes)
-    #[arg(long, default_value = "rune")]
-    pub k8s_namespace: String,
 }
 
 #[derive(Debug, Clone, ValueEnum)]
 pub enum BackendChoice {
     Wasm,
     Docker,
-    Kubernetes,
 }
 
 #[derive(clap::Args)]

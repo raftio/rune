@@ -35,10 +35,8 @@ fn daemonize(args: &StartArgs) -> Result<()> {
     let backend_str = match args.backend {
         crate::cli::BackendChoice::Wasm => "wasm",
         crate::cli::BackendChoice::Docker => "docker",
-        crate::cli::BackendChoice::Kubernetes => "kubernetes",
     };
     cmd.arg("--backend").arg(backend_str);
-    cmd.arg("--k8s-namespace").arg(&args.k8s_namespace);
 
     cmd.arg("--log-file").arg(&args.log_file);
 
@@ -151,16 +149,6 @@ async fn run_server(args: &StartArgs, platform_env: PlatformEnv) -> Result<()> {
         }
         crate::cli::BackendChoice::Docker => {
             Arc::new(rune_docker_backend::DockerBackend::new(store.clone(), platform_env.clone())?)
-        }
-        crate::cli::BackendChoice::Kubernetes => {
-            Arc::new(
-                rune_k8s_backend::KubernetesBackend::new(
-                    store.clone(),
-                    args.k8s_namespace.clone(),
-                    platform_env.clone(),
-                )
-                .await?,
-            )
         }
     };
 

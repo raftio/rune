@@ -12,7 +12,6 @@ members = [
     "crates/rune-gateway",
     "crates/rune-backend/rune-wasm",
     "crates/rune-backend/rune-docker",
-    "crates/rune-backend/rune-k8s",
     "crates/rune-env",
     "crates/rune-tools",
     "crates/rune-cmd",
@@ -46,10 +45,6 @@ bollard = { version = "0.17" }
 
 # WASM
 wasmtime = { version = "25", default-features = false, features = ["cranelift", "runtime", "async"] }
-
-# Kubernetes
-kube = { version = "0.98", features = ["runtime", "derive", "client"] }
-k8s-openapi = { version = "0.24", features = ["v1_32"] }
 
 # Tracing
 tracing = { version = "0.1" }
@@ -122,4 +117,3 @@ rune-env = { path = "crates/rune-env" }
 rune-tools = { path = "crates/rune-tools" }
 rune-wasm-backend = { path = "crates/rune-backend/rune-wasm" }
 rune-docker-backend = { path = "crates/rune-backend/rune-docker" }
-rune-k8s-backend = { path = "crates/rune-backend/rune-k8s" }

@@ -2,7 +2,7 @@
 
 > **Early development** — APIs and features may change. We welcome feedback and contributions.
 
-**Production-grade AI agent runtime** written in Rust. Rune handles the full lifecycle of AI agents: packaging, deploying, scheduling, executing, networking, and running them at scale — across Docker, Kubernetes, and WASM backends.
+**Production-grade AI agent runtime** written in Rust. Rune handles the full lifecycle of AI agents: packaging, deploying, scheduling, executing, networking, and running them at scale — across Docker and WASM backends.
 
 ## Key Features
 
@@ -10,8 +10,6 @@
 - **MCP support** — agents consume external MCP servers as tools; Rune exposes all deployed agents as an MCP server at `POST /mcp`
 - **Multi-backend** — Run agents as WASM modules, Docker containers, or Kubernetes workloads
 - **Agent-to-Agent (A2A)** — Agents can call each other via the Google A2A protocol over JSON-RPC
-- **40+ Channels** — Integrate with Slack, Telegram, Discord, email, and many more messaging platforms
-- **Built-in tools** — Filesystem, web search, shell, memory, knowledge graph, browser automation, scheduling, task queue, and more
 - **Workflows** — DAG-based multi-agent pipelines with parallel execution and conditional steps
 - **Compose** — Deploy multiple agents together with dependency ordering
 - **Clustering** — Optional Raft consensus for multi-node high-availability deployments

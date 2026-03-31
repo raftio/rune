@@ -1,3 +1,0 @@
-channels:
-  - type: telegram
-    bot_token: ${RUNE_TELEGRAM_BOT_TOKEN}

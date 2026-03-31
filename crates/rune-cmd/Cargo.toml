@@ -16,7 +16,6 @@ rune-cp = { workspace = true }
 rune-gateway = { workspace = true }
 rune-wasm-backend = { workspace = true }
 rune-docker-backend = { workspace = true }
-rune-k8s-backend = { workspace = true }
 tokio = { workspace = true }
 axum = { workspace = true }
 clap = { workspace = true }

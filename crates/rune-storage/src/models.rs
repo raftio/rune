@@ -93,7 +93,6 @@ impl std::fmt::Display for ReplicaState {
 pub enum BackendType {
     Wasm,
     Docker,
-    Kubernetes,
 }
 
 impl std::fmt::Display for BackendType {
@@ -101,7 +100,6 @@ impl std::fmt::Display for BackendType {
         match self {
             Self::Wasm => write!(f, "wasm"),
             Self::Docker => write!(f, "docker"),
-            Self::Kubernetes => write!(f, "kubernetes"),
         }
     }
 }
