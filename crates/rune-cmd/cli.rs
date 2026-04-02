@@ -308,7 +308,7 @@ pub struct ComposePsArgs {
 
 #[derive(Subcommand)]
 pub enum ArtifactCommand {
-    /// Pack the agent at AGENT_DIR (~/.rune/config.toml) into a .tar.gz artifact
+    /// Pack an agent directory into ~/.rune/artifacts/{name}-{tag}.tar.gz
     Build(ArtifactBuildArgs),
     /// Verify ~/.rune/artifacts/{name}-{tag}.tar.gz
     Verify(ArtifactVerifyArgs),
@@ -316,6 +316,8 @@ pub enum ArtifactCommand {
 
 #[derive(clap::Args)]
 pub struct ArtifactBuildArgs {
+    /// Agent directory (contains Runefile)
+    pub agent_dir: std::path::PathBuf,
     /// Local tag for manifest and filename ~/.rune/artifacts/{agent-name}-{tag}.tar.gz (default: latest)
     #[arg(long)]
     pub tag: Option<String>,

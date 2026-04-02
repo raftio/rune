@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-use crate::{AgentSpec, RuntimeSpec, ModelsSpec};
+use crate::{AgentSpec, ModelsSpec};
 use crate::error::SpecError;
 
 /// Single-file agent definition that merges spec, runtime, and models.
@@ -9,7 +9,6 @@ use crate::error::SpecError;
 pub struct Runefile {
     #[serde(flatten)]
     pub spec: AgentSpec,
-    pub runtime: RuntimeSpec,
     pub models: ModelsSpec,
 }
 
@@ -38,17 +37,6 @@ memory_profile: standard
 max_steps: 10
 timeout_ms: 30000
 
-runtime:
-  concurrency_limit: 10
-  health_probe:
-    path: /health
-    interval_ms: 5000
-  startup_timeout_ms: 10000
-  request_timeout_ms: 30000
-  streaming_enabled: true
-  checkpoint_policy: on_finish
-  resource_profile: small
-
 models:
   providers:
     - openai
@@ -66,8 +54,6 @@ models:
         assert_eq!(rf.spec.name, "chat");
         assert_eq!(rf.spec.version, "0.1.0");
         assert_eq!(rf.spec.max_steps, 10);
-        assert_eq!(rf.runtime.concurrency_limit, 10);
-        assert_eq!(rf.runtime.health_probe.path, "/health");
         assert_eq!(rf.models.providers, vec!["openai"]);
         assert_eq!(rf.models.model_mapping["default"], "gpt-4o-mini");
     }
@@ -75,19 +61,10 @@ models:
     #[test]
     fn spec_fields_correctly_deserialized() {
         let rf: Runefile = serde_yaml::from_str(runefile_yaml()).unwrap();
-        assert_eq!(rf.spec.default_model, "default");
         assert!(rf.spec.toolset.is_empty());
         assert!(matches!(rf.spec.memory_profile, crate::agent::MemoryProfile::Standard));
         assert_eq!(rf.spec.timeout_ms, 30_000);
         assert_eq!(rf.spec.networks, vec!["bridge"]);
-    }
-
-    #[test]
-    fn runtime_fields_correctly_deserialized() {
-        let rf: Runefile = serde_yaml::from_str(runefile_yaml()).unwrap();
-        assert!(rf.runtime.streaming_enabled);
-        assert!(matches!(rf.runtime.checkpoint_policy, crate::runtime::CheckpointPolicy::OnFinish));
-        assert!(matches!(rf.runtime.resource_profile, crate::runtime::ResourceProfile::Small));
     }
 
     #[test]
@@ -104,7 +81,6 @@ models:
         std::fs::write(file.path(), runefile_yaml()).unwrap();
         let rf = Runefile::load(file.path()).unwrap();
         assert_eq!(rf.spec.name, "chat");
-        assert_eq!(rf.runtime.concurrency_limit, 10);
         assert_eq!(rf.models.providers, vec!["openai"]);
     }
 
@@ -126,9 +102,6 @@ models:
     fn minimal_runtime_empty_map_uses_defaults() {
         let yaml = "name: a\nversion: 0.1.0\ninstructions: x\ndefault_model: d\nruntime: {}\nmodels: {}\n";
         let rf: Runefile = serde_yaml::from_str(yaml).unwrap();
-        assert_eq!(rf.runtime.concurrency_limit, 10);
-        assert_eq!(rf.runtime.health_probe.path, "/health");
-        assert!(rf.runtime.streaming_enabled);
         assert!(rf.models.providers.is_empty());
         assert_eq!(rf.models.token_budget, 100_000);
     }
@@ -150,24 +123,6 @@ skills:
         assert_eq!(rf.spec.skills.len(), 2);
         assert_eq!(rf.spec.skills[0], "anthropics/claude-code/frontend-design");
         assert_eq!(rf.spec.skills[1], "https://skills.sh/vercel-labs/agent-skills/find-skills");
-    }
-
-    #[test]
-    fn runefile_with_mcp_servers() {
-        let yaml = r#"
-name: a
-version: 0.1.0
-instructions: x
-default_model: d
-runtime: {}
-models: {}
-mcp_servers:
-  - name: search
-    url: http://localhost:3001/mcp
-"#;
-        let rf: Runefile = serde_yaml::from_str(yaml).unwrap();
-        assert_eq!(rf.spec.mcp_servers.len(), 1);
-        assert_eq!(rf.spec.mcp_servers[0].name, "search");
     }
 
     #[test]

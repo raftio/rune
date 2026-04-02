@@ -3,7 +3,6 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use rune_artifact::PackOptions;
-use rune_env::agent_dir_from_config;
 use rune_spec::AgentPackage;
 
 use crate::cli::{ArtifactBuildArgs, ArtifactVerifyArgs};
@@ -47,11 +46,7 @@ fn prepare_artifact_output_path(agent_name: &str, tag: &str) -> Result<PathBuf> 
 }
 
 pub fn build(args: ArtifactBuildArgs) -> Result<()> {
-    let agent_dir = agent_dir_from_config().ok_or_else(|| {
-        anyhow::anyhow!(
-            "set AGENT_DIR in ~/.rune/config.toml to the agent directory (contains Runefile)"
-        )
-    })?;
+    let agent_dir = args.agent_dir;
     let tag = args.tag.unwrap_or_else(|| "latest".to_string());
 
     let pkg = AgentPackage::load(&agent_dir)

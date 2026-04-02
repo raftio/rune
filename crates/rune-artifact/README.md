@@ -41,17 +41,17 @@ The packer only includes **on-disk** files under the agent directory. Skill refe
 From the workspace `rune` binary:
 
 ```bash
-# AGENT_DIR in ~/.rune/config.toml — writes ~/.rune/artifacts/{agent-name}-latest.tar.gz
-cargo run -p rune -- artifact build
+# Writes ~/.rune/artifacts/{agent-name}-{tag}.tar.gz (tag defaults to latest)
+cargo run -p rune -- artifact build /path/to/agent
 
-cargo run -p rune -- artifact build --tag v1.0.0
+cargo run -p rune -- artifact build /path/to/agent --tag v1.0.0
 cargo run -p rune -- artifact verify my-agent
 cargo run -p rune -- artifact verify my-agent v1.0.0
 ```
 
 Defaults:
 
-- **Agent directory:** only **`AGENT_DIR`** in `~/.rune/config.toml` (no path on the CLI; see the template created on first access).
+- **Agent directory:** required **positional path** on `artifact build` (directory containing `Runefile`).
 - **Output:** always **`~/.rune/artifacts/{agent-name}-{tag}.tar.gz`** (directory is created as needed; no `-o`).
 - **`--tag`:** defaults to **`latest`** for both the filename and the manifest `tag` field.
 - **`artifact verify NAME [TAG]`:** checks the same path pattern; **`TAG`** defaults to **`latest`** if omitted.

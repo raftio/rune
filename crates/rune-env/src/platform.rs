@@ -37,20 +37,7 @@ const CONFIG_TEMPLATE: &str = r#"# Rune configuration file — ~/.rune/config.to
 
 # ── Gateway ───────────────────────────────────────────────────────────────────
 # GATEWAY_BASE_URL = "http://localhost:3000"
-
-# ── Agent project (optional) ───────────────────────────────────────────────────
-# Agent directory for `rune artifact build` (must contain Runefile); required — no path on CLI.
-# AGENT_DIR = "/path/to/my-agent"
 "#;
-
-/// `AGENT_DIR` from `~/.rune/config.toml` (required for `rune artifact build`; no agent path on CLI).
-pub fn agent_dir_from_config() -> Option<std::path::PathBuf> {
-    let map = load_config_file();
-    map.get("AGENT_DIR")
-        .map(|s| s.as_str())
-        .filter(|s| !s.is_empty())
-        .map(std::path::PathBuf::from)
-}
 
 /// Load `~/.rune/config.toml` into a key-value map.
 /// Creates the file with a commented template if it does not exist.

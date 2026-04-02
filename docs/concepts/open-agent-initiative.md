@@ -11,8 +11,8 @@ The **Open Agent Initiative (OAI)** is a **working name** for Rune’s **portabl
 Agents need a **clear boundary** between “source tree in development” and “shippable unit” that can be:
 
 - **Reproduced** from the same inputs (deterministic layout and hashing).
-- **Verified** after download or copy (per-file SHA-256 in a manifest).
-- **Named and versioned** without implying a container registry (`Runefile` version, optional local `tag`, output filename, git).
+- **Verified** after copy or build (per-file SHA-256 in a manifest).
+- **Addressed** by **name** and **tag** (like a simple coordinate) without a container registry—aligned with how the CLI stores and checks artifacts under `~/.rune/artifacts/`.
 
 OAI provides that boundary in Rune today as **`rune-artifact-v1`**: gzip-compressed tar with an `agent/manifest.json` and an `agent/` tree compatible with `AgentPackage::load`.
 
@@ -24,6 +24,18 @@ OAI provides that boundary in Rune today as **`rune-artifact-v1`**: gzip-compres
 | **OCI** | Open Container Initiative — industry standards for **container** images and runtimes. OAI artifacts are **not** OCI images. |
 | **`rune-artifact-v1`** | On-disk format version string in `manifest.json` (`format`). |
 | **Artifact digest** | SHA-256 of the **entire** `.tar.gz` bytes (printed by `rune artifact build`; not self-referentially embedded in `manifest.json` in v1). |
+| **Artifact store path** | Default location **`~/.rune/artifacts/{name}-{tag}.tar.gz`**, where `name` comes from the packed agent’s Runefile and `tag` is a CLI label (default **`latest`**). |
+
+## CLI conventions (current)
+
+The **`rune`** binary takes a **source path** for pack and **name/tag** coordinates for verify:
+
+| Command | Role |
+|--------|------|
+| **`rune artifact build`** `AGENT_DIR` `[--tag TAG]` | Packs the agent at **`AGENT_DIR`** (must contain `Runefile`). Writes **`~/.rune/artifacts/{agent-name}-{tag}.tar.gz`**. No custom output path flag. **`--tag`** defaults to **`latest`** (filename + manifest `tag`). |
+| **`rune artifact verify`** `NAME` `[TAG]` | Verifies the file **`~/.rune/artifacts/{NAME}-{TAG}.tar.gz`** (same naming rule as build, including sanitization). **`TAG`** defaults to **`latest`** if omitted. No raw filesystem path on the CLI. |
+
+The library crate **`rune-artifact`** exposes pack/verify/extract APIs for arbitrary paths for embedders and tests.
 
 ## Design principles
 
@@ -46,11 +58,10 @@ After extraction, the archive root contains:
 
 Recommended practice without a registry:
 
-- **`Runefile`** `name` and `version` as the canonical semantic identity.
-- **Agent path** only via **`AGENT_DIR`** in `~/.rune/config.toml` (`rune artifact build` does not accept a directory path on the CLI).
-- **Output** is always `~/.rune/artifacts/{agent-name}-{tag}.tar.gz`; **`--tag`** defaults to **`latest`** in the filename and manifest.
-- **`rune artifact build --tag`** `LABEL` sets the tag when you need a label other than `latest`.
-- **Git** for source history; `--tag` can mirror git tags when useful.
+- **`Runefile`** `name` and `version` as the canonical semantic identity of the agent **spec**.
+- **Source tree** passed explicitly as **`rune artifact build AGENT_DIR`** (path to the directory containing `Runefile`).
+- **Artifact identity** via **`{name}`** (from Runefile at pack time) and **`tag`** (`--tag` on build, default **`latest`** in filename and manifest); **`rune artifact verify NAME [TAG]`** uses the same pair to locate the bundle under **`~/.rune/artifacts/`**.
+- **Git** for history; **`--tag`** can mirror git tags when useful.
 
 ## Security and trust
 
@@ -63,7 +74,7 @@ The control plane may store **`image_ref`** / **`image_digest`** for **runtime**
 
 ## Roadmap (non-normative)
 
-- **Current:** Local pack, verify, extract; CLI `rune artifact build` / `verify`.
+- **Current:** Local pack and verify via `rune artifact build` / `verify`; library `extract` / `AgentPackage::load` for runtime; **no** remote registry in this iteration.
 - **Deferred:** Remote registry or object store, optional OCI Distribution **as transport only** for the same bytes (still not claiming an OAI bundle is a “container image”), control-plane fields for artifact digest.
 
 ## References

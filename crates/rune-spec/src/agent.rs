@@ -1,24 +1,11 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Configuration for an external MCP server to connect to at agent load time.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct McpServerConfig {
-    /// Logical name — used as tool name prefix: `{name}/{tool}`.
-    pub name: String,
-    /// HTTP URL of the MCP server (e.g. `http://localhost:3001/mcp`).
-    pub url: String,
-    /// Optional HTTP headers. Values support `${ENV_VAR}` interpolation.
-    #[serde(default)]
-    pub headers: std::collections::HashMap<String, String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentSpec {
     pub name: String,
     pub version: String,
     pub instructions: String,
-    pub default_model: String,
     #[serde(default)]
     pub toolset: Vec<String>,
     /// Skills to inject into the agent's instructions.
@@ -47,9 +34,6 @@ pub struct AgentSpec {
     /// share at least one network. Defaults to ["bridge"].
     #[serde(default = "default_networks")]
     pub networks: Vec<String>,
-    /// External MCP servers to connect to at agent load time.
-    #[serde(default)]
-    pub mcp_servers: Vec<McpServerConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -81,7 +65,6 @@ mod tests {
         assert_eq!(spec.name, "test-agent");
         assert_eq!(spec.version, "0.1.0");
         assert_eq!(spec.instructions, "You are a test agent.");
-        assert_eq!(spec.default_model, "default");
     }
 
     #[test]
@@ -117,7 +100,6 @@ routing_hints:
         let spec: AgentSpec = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(spec.name, "my-agent");
         assert_eq!(spec.version, "1.2.3");
-        assert_eq!(spec.default_model, "fast");
         assert_eq!(spec.toolset, vec!["rune@file-read", "my_tool"]);
         assert!(matches!(spec.memory_profile, MemoryProfile::Extended));
         assert_eq!(spec.max_steps, 50);
@@ -192,76 +174,11 @@ toolset:
     }
 
     #[test]
-    fn mcp_servers_default_is_empty() {
-        let spec: AgentSpec = serde_yaml::from_str(minimal_yaml()).unwrap();
-        assert!(spec.mcp_servers.is_empty());
-    }
-
-    #[test]
-    fn mcp_servers_parsed() {
-        let yaml = r#"
-name: a
-version: 0.1.0
-instructions: x
-default_model: d
-mcp_servers:
-  - name: my-mcp
-    url: http://localhost:3001/mcp
-    headers:
-      Authorization: "Bearer ${MCP_TOKEN}"
-"#;
-        let spec: AgentSpec = serde_yaml::from_str(yaml).unwrap();
-        assert_eq!(spec.mcp_servers.len(), 1);
-        let mcp = &spec.mcp_servers[0];
-        assert_eq!(mcp.name, "my-mcp");
-        assert_eq!(mcp.url, "http://localhost:3001/mcp");
-        assert_eq!(
-            mcp.headers.get("Authorization").map(|s| s.as_str()),
-            Some("Bearer ${MCP_TOKEN}")
-        );
-    }
-
-    #[test]
-    fn mcp_server_headers_default_is_empty() {
-        let yaml = r#"
-name: a
-version: 0.1.0
-instructions: x
-default_model: d
-mcp_servers:
-  - name: no-auth
-    url: http://localhost:3001/mcp
-"#;
-        let spec: AgentSpec = serde_yaml::from_str(yaml).unwrap();
-        assert!(spec.mcp_servers[0].headers.is_empty());
-    }
-
-    #[test]
-    fn multiple_mcp_servers_parsed() {
-        let yaml = r#"
-name: a
-version: 0.1.0
-instructions: x
-default_model: d
-mcp_servers:
-  - name: search
-    url: http://localhost:3001/mcp
-  - name: storage
-    url: http://localhost:3002/mcp
-"#;
-        let spec: AgentSpec = serde_yaml::from_str(yaml).unwrap();
-        assert_eq!(spec.mcp_servers.len(), 2);
-        assert_eq!(spec.mcp_servers[0].name, "search");
-        assert_eq!(spec.mcp_servers[1].name, "storage");
-    }
-
-    #[test]
     fn skills_parsed_correctly() {
         let yaml = r#"
 name: a
 version: 0.1.0
 instructions: x
-default_model: d
 skills:
   - anthropics/claude-code/frontend-design
   - vercel-labs/agent-skills/find-skills
