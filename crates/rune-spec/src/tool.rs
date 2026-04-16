@@ -227,11 +227,48 @@ timeout_ms: 30000
             ("container", "Container"),
             ("agent", "Agent"),
             ("builtin", "Builtin"),
+            ("mcp", "Mcp"),
         ] {
             let yaml = format!("name: t\nruntime: {val}\n");
             let tool: ToolDescriptor = serde_yaml::from_str(&yaml).unwrap();
             assert!(format!("{:?}", tool.runtime).contains(variant));
         }
+    }
+
+    #[test]
+    fn parse_mcp_tool() {
+        let yaml = "name: search\nruntime: mcp\nmcp_server: my-mcp\n";
+        let tool: ToolDescriptor = serde_yaml::from_str(yaml).unwrap();
+        assert!(matches!(tool.runtime, ToolRuntime::Mcp));
+        assert_eq!(tool.mcp_server.as_deref(), Some("my-mcp"));
+    }
+
+    #[test]
+    fn mcp_server_field_default_is_none() {
+        let tool: ToolDescriptor = serde_yaml::from_str("name: t\n").unwrap();
+        assert!(tool.mcp_server.is_none());
+    }
+
+    #[test]
+    fn load_invalid_yaml_returns_parse_error() {
+        let file = tempfile::NamedTempFile::with_suffix(".yaml").unwrap();
+        std::fs::write(file.path(), "name: [unclosed").unwrap();
+        let err = ToolDescriptor::load(file.path()).unwrap_err();
+        assert!(err.to_string().contains("Parse error"));
+    }
+
+    #[test]
+    fn retry_policy_custom_max_attempts() {
+        let yaml = "name: t\nretry_policy:\n  max_attempts: 5\n";
+        let tool: ToolDescriptor = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(tool.retry_policy.max_attempts, 5);
+    }
+
+    #[test]
+    fn capabilities_parsed() {
+        let yaml = "name: t\ncapabilities:\n  - network\n  - filesystem\n";
+        let tool: ToolDescriptor = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(tool.capabilities, vec!["network", "filesystem"]);
     }
 
     #[test]

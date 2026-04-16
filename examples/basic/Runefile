@@ -25,7 +25,8 @@ runtime:
   streaming_enabled: true
   checkpoint_policy: on_finish
   resource_profile: small
-
+skills:
+  - anthropics/skills/frontend-design
 # Model configuration
 models:
   providers:

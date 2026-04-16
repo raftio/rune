@@ -11,8 +11,6 @@ pub struct ModelsSpec {
     pub fallback_policy: FallbackPolicy,
     #[serde(default = "default_token_budget")]
     pub token_budget: u32,
-    #[serde(default)]
-    pub safety_policy: SafetyPolicy,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -21,15 +19,6 @@ pub enum FallbackPolicy {
     #[default]
     NextProvider,
     Fail,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum SafetyPolicy {
-    #[default]
-    Standard,
-    Strict,
-    None,
 }
 
 fn default_token_budget() -> u32 { 100_000 }
@@ -47,7 +36,6 @@ mod tests {
         assert!(spec.model_mapping.is_empty());
         assert!(matches!(spec.fallback_policy, FallbackPolicy::NextProvider));
         assert_eq!(spec.token_budget, 100_000);
-        assert!(matches!(spec.safety_policy, SafetyPolicy::Standard));
     }
 
     #[test]
@@ -69,7 +57,6 @@ safety_policy: strict
         assert_eq!(spec.model_mapping["fast"], "claude-haiku-4-5");
         assert!(matches!(spec.fallback_policy, FallbackPolicy::Fail));
         assert_eq!(spec.token_budget, 50_000);
-        assert!(matches!(spec.safety_policy, SafetyPolicy::Strict));
     }
 
     #[test]
@@ -78,19 +65,6 @@ safety_policy: strict
             let yaml = format!("fallback_policy: {val}");
             let spec: ModelsSpec = serde_yaml::from_str(&yaml).unwrap();
             assert!(format!("{:?}", spec.fallback_policy).contains(expected));
-        }
-    }
-
-    #[test]
-    fn safety_policy_variants() {
-        for (val, expected) in &[
-            ("standard", "Standard"),
-            ("strict", "Strict"),
-            ("none", "None"),
-        ] {
-            let yaml = format!("safety_policy: {val}");
-            let spec: ModelsSpec = serde_yaml::from_str(&yaml).unwrap();
-            assert!(format!("{:?}", spec.safety_policy).contains(expected));
         }
     }
 

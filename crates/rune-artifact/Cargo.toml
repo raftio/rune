@@ -1,0 +1,17 @@
+[package]
+name = "rune-artifact"
+version = "0.1.0"
+edition = "2021"
+description = "Pack and verify Rune agent directories as portable tar.gz artifacts"
+
+[dependencies]
+rune-spec = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tar = { workspace = true }
+flate2 = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+tempfile = { workspace = true }
+chrono = { workspace = true }
+hex = { workspace = true }

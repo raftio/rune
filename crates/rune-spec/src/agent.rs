@@ -1,60 +1,26 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
-/// Configuration for an external MCP server to connect to at agent load time.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct McpServerConfig {
-    /// Logical name — used as tool name prefix: `{name}/{tool}`.
-    pub name: String,
-    /// HTTP URL of the MCP server (e.g. `http://localhost:3001/mcp`).
-    pub url: String,
-    /// Optional HTTP headers. Values support `${ENV_VAR}` interpolation.
-    #[serde(default)]
-    pub headers: std::collections::HashMap<String, String>,
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Arch {
+    #[default]
+    ReAct,
 }
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentSpec {
     pub name: String,
     pub version: String,
     pub instructions: String,
-    pub default_model: String,
-    #[serde(default)]
-    pub toolset: Vec<String>,
-    /// Skills from skills.sh to inject into the agent's instructions.
-    /// Format: `owner/repo/skill-name` (e.g. `anthropics/claude-code/frontend-design`).
-    /// Install locally with: `npx skills add owner/repo/skill-name`
-    #[serde(default)]
-    pub skills: Vec<String>,
-    #[serde(default)]
-    pub memory_profile: MemoryProfile,
-    #[serde(default)]
-    pub routing_hints: HashMap<String, serde_json::Value>,
+   #[serde(default)]
+    pub arch: Arch,
     #[serde(default = "default_max_steps")]
     pub max_steps: u32,
     #[serde(default = "default_timeout_ms")]
     pub timeout_ms: u64,
-    /// rune-network memberships. Agents can only call each other when they
-    /// share at least one network. Defaults to ["bridge"].
-    #[serde(default = "default_networks")]
-    pub networks: Vec<String>,
-    /// External MCP servers to connect to at agent load time.
-    #[serde(default)]
-    pub mcp_servers: Vec<McpServerConfig>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum MemoryProfile {
-    #[default]
-    Minimal,
-    Standard,
-    Extended,
 }
 
 fn default_max_steps() -> u32 { 20 }
 fn default_timeout_ms() -> u64 { 30_000 }
-fn default_networks() -> Vec<String> { vec!["bridge".into()] }
 
 impl AgentSpec {}
 
@@ -67,23 +33,11 @@ mod tests {
     }
 
     #[test]
-    fn parse_minimal() {
+        fn parse_minimal() {
         let spec: AgentSpec = serde_yaml::from_str(minimal_yaml()).unwrap();
         assert_eq!(spec.name, "test-agent");
         assert_eq!(spec.version, "0.1.0");
         assert_eq!(spec.instructions, "You are a test agent.");
-        assert_eq!(spec.default_model, "default");
-    }
-
-    #[test]
-    fn defaults_applied() {
-        let spec: AgentSpec = serde_yaml::from_str(minimal_yaml()).unwrap();
-        assert!(spec.toolset.is_empty());
-        assert!(matches!(spec.memory_profile, MemoryProfile::Minimal));
-        assert!(spec.routing_hints.is_empty());
-        assert_eq!(spec.max_steps, 20);
-        assert_eq!(spec.timeout_ms, 30_000);
-        assert_eq!(spec.networks, vec!["bridge"]);
     }
 
     #[test]
@@ -108,65 +62,8 @@ routing_hints:
         let spec: AgentSpec = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(spec.name, "my-agent");
         assert_eq!(spec.version, "1.2.3");
-        assert_eq!(spec.default_model, "fast");
-        assert_eq!(spec.toolset, vec!["rune@file-read", "my_tool"]);
-        assert!(matches!(spec.memory_profile, MemoryProfile::Extended));
         assert_eq!(spec.max_steps, 50);
         assert_eq!(spec.timeout_ms, 60_000);
-        assert_eq!(spec.networks, vec!["bridge", "internal"]);
-        assert!(spec.routing_hints.contains_key("priority"));
-    }
-
-    #[test]
-    fn memory_profile_variants() {
-        for (yaml_val, expected) in &[
-            ("minimal", "Minimal"),
-            ("standard", "Standard"),
-            ("extended", "Extended"),
-        ] {
-            let yaml = format!(
-                "name: a\nversion: 0.1.0\ninstructions: x\ndefault_model: d\nmemory_profile: {yaml_val}\n"
-            );
-            let spec: AgentSpec = serde_yaml::from_str(&yaml).unwrap();
-            assert!(format!("{:?}", spec.memory_profile).contains(expected));
-        }
-    }
-
-    #[test]
-    fn memory_profile_default_is_minimal() {
-        let spec: AgentSpec = serde_yaml::from_str(minimal_yaml()).unwrap();
-        assert!(matches!(spec.memory_profile, MemoryProfile::Minimal));
-    }
-
-    #[test]
-    fn toolset_with_builtin_and_custom() {
-        let yaml = r#"
-name: a
-version: 0.1.0
-instructions: x
-default_model: d
-toolset:
-  - rune@shell
-  - rune@web-search
-  - custom_tool
-"#;
-        let spec: AgentSpec = serde_yaml::from_str(yaml).unwrap();
-        assert_eq!(spec.toolset.len(), 3);
-        assert!(spec.toolset[0].starts_with("rune@"));
-        assert_eq!(spec.toolset[2], "custom_tool");
-    }
-
-    #[test]
-    fn networks_default_contains_bridge() {
-        let spec: AgentSpec = serde_yaml::from_str(minimal_yaml()).unwrap();
-        assert_eq!(spec.networks, vec!["bridge"]);
-    }
-
-    #[test]
-    fn networks_custom() {
-        let yaml = "name: a\nversion: 0.1.0\ninstructions: x\ndefault_model: d\nnetworks: [net-a, net-b]\n";
-        let spec: AgentSpec = serde_yaml::from_str(yaml).unwrap();
-        assert_eq!(spec.networks, vec!["net-a", "net-b"]);
     }
 
     #[test]
@@ -176,26 +73,4 @@ toolset:
         assert!(err.is_err());
     }
 
-    #[test]
-    fn skills_default_is_empty() {
-        let spec: AgentSpec = serde_yaml::from_str(minimal_yaml()).unwrap();
-        assert!(spec.skills.is_empty());
-    }
-
-    #[test]
-    fn skills_parsed_correctly() {
-        let yaml = r#"
-name: a
-version: 0.1.0
-instructions: x
-default_model: d
-skills:
-  - anthropics/claude-code/frontend-design
-  - vercel-labs/agent-skills/find-skills
-"#;
-        let spec: AgentSpec = serde_yaml::from_str(yaml).unwrap();
-        assert_eq!(spec.skills.len(), 2);
-        assert_eq!(spec.skills[0], "anthropics/claude-code/frontend-design");
-        assert_eq!(spec.skills[1], "vercel-labs/agent-skills/find-skills");
-    }
 }

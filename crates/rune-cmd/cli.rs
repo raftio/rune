@@ -57,6 +57,11 @@ pub enum Command {
         #[command(subcommand)]
         cmd: ClusterCommand,
     },
+    /// Pack or verify portable agent archives (Open Agent Initiative / gzip tar)
+    Artifact {
+        #[command(subcommand)]
+        cmd: ArtifactCommand,
+    },
     /// Tail daemon logs, or restart daemon with a new log level
     Debug(DebugArgs),
 }
@@ -87,6 +92,9 @@ pub struct AgentInspectArgs {
     pub alias: Option<String>,
     #[arg(long, default_value = "http://localhost:8081")]
     pub control_plane: String,
+    /// Optional local agent directory to print Runefile summary (skills, toolset, instructions excerpt)
+    #[arg(long)]
+    pub agent_dir: Option<std::path::PathBuf>,
 }
 
 #[derive(clap::Args)]
@@ -296,6 +304,32 @@ pub struct ComposePsArgs {
     pub file: String,
     #[arg(long, default_value = "http://localhost:8081")]
     pub control_plane: String,
+}
+
+#[derive(Subcommand)]
+pub enum ArtifactCommand {
+    /// Pack an agent directory into ~/.rune/artifacts/{name}-{tag}.tar.gz
+    Build(ArtifactBuildArgs),
+    /// Verify ~/.rune/artifacts/{name}-{tag}.tar.gz
+    Verify(ArtifactVerifyArgs),
+}
+
+#[derive(clap::Args)]
+pub struct ArtifactBuildArgs {
+    /// Agent directory (contains Runefile)
+    pub agent_dir: std::path::PathBuf,
+    /// Local tag for manifest and filename ~/.rune/artifacts/{agent-name}-{tag}.tar.gz (default: latest)
+    #[arg(long)]
+    pub tag: Option<String>,
+}
+
+#[derive(clap::Args)]
+pub struct ArtifactVerifyArgs {
+    /// Agent name (filename prefix; same as Runefile `name` from build)
+    pub name: String,
+    /// Tag (default: latest)
+    #[arg(default_value = "latest")]
+    pub tag: String,
 }
 
 #[derive(Subcommand)]

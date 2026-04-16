@@ -1,4 +1,5 @@
 pub mod agent;
+pub mod artifact;
 pub mod debug;
 pub mod cluster;
 pub mod compose;
