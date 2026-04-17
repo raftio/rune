@@ -290,6 +290,9 @@ pub enum ArtifactCommand {
     Inspect(ArtifactInspectArgs),
     /// List materialized bundle dirs and .tar.gz archives under ~/.rune/artifacts
     Ls,
+    /// Remove a materialized bundle at ~/.rune/artifacts/{name}-{tag}/ (refuses if a deployment still uses this spec)
+    #[command(alias = "rm")]
+    Remove(ArtifactRemoveArgs),
 }
 
 #[derive(clap::Args)]
@@ -320,6 +323,20 @@ pub struct ArtifactInspectArgs {
     /// Tag (default: latest)
     #[arg(default_value = "latest")]
     pub tag: String,
+}
+
+#[derive(clap::Args)]
+pub struct ArtifactRemoveArgs {
+    /// Agent name (same as Runefile `name` from build)
+    pub name: String,
+    /// Tag (default: latest)
+    #[arg(default_value = "latest")]
+    pub tag: String,
+    #[arg(long, default_value = "http://localhost:8081")]
+    pub control_plane: String,
+    /// Skip check for deployments that use this bundle (same spec as `rune run` from this directory)
+    #[arg(long)]
+    pub force: bool,
 }
 
 #[derive(Subcommand)]

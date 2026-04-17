@@ -101,6 +101,7 @@ async fn main() -> Result<()> {
             ArtifactCommand::Export(args) => commands::artifact::export_cmd(args)?,
             ArtifactCommand::Inspect(args) => commands::artifact::inspect_cmd(args)?,
             ArtifactCommand::Ls => commands::artifact::ls()?,
+            ArtifactCommand::Remove(args) => commands::artifact::remove_cmd(args).await?,
         },
     }
 

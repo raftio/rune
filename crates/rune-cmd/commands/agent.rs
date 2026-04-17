@@ -77,7 +77,7 @@ pub fn resolve_agent_source_or_artifact(
 // ---------------------------------------------------------------------------
 
 /// Raw control-plane lists (deployments JSON rows, agent-version JSON rows).
-async fn fetch_control_plane_state(
+pub(crate) async fn fetch_control_plane_state(
     http: &reqwest::Client,
     base: &str,
 ) -> Result<(Vec<serde_json::Value>, Vec<serde_json::Value>)> {

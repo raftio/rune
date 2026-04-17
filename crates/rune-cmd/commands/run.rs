@@ -26,7 +26,7 @@ pub async fn exec(args: RunArgs) -> Result<()> {
             "version":       pkg.spec.version,
             "image_ref":     format!("local/{}", pkg.spec.name),
             "image_digest":  format!("sha256:{:x}", simple_hash(&pkg.spec.name)),
-            "spec_sha256":   format!("{:x}", simple_hash(&pkg.spec.instructions)),
+            "spec_sha256":   spec_fingerprint_for_package(&pkg),
             "runtime_class": "wasm",
         }))
         .send()
@@ -57,6 +57,12 @@ pub async fn exec(args: RunArgs) -> Result<()> {
     );
     println!("Done. Agent '{}' deployed.", pkg.spec.name);
     Ok(())
+}
+
+/// Hex fingerprint stored as `spec_sha256` on the control plane when registering an agent version
+/// via `rune run` — must stay in sync with [`exec`].
+pub fn spec_fingerprint_for_package(pkg: &rune_spec::AgentPackage) -> String {
+    format!("{:x}", simple_hash(&pkg.spec.instructions))
 }
 
 fn simple_hash(s: &str) -> u64 {

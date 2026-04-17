@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
@@ -6,7 +7,7 @@ use anyhow::{Context, Result};
 use rune_artifact::PackOptions;
 use rune_spec::AgentPackage;
 
-use crate::cli::{ArtifactBuildArgs, ArtifactExportArgs, ArtifactInspectArgs};
+use crate::cli::{ArtifactBuildArgs, ArtifactExportArgs, ArtifactInspectArgs, ArtifactRemoveArgs};
 
 fn sanitize_filename_component(name: &str) -> String {
     let s: String = name
@@ -502,5 +503,107 @@ pub fn inspect_cmd(args: ArtifactInspectArgs) -> Result<()> {
     let m = rune_artifact::verify(f)
         .with_context(|| format!("verify artifact archive {}", tar_path.display()))?;
     print_inspect_manifest(&m);
+    Ok(())
+}
+
+fn deployment_still_active(d: &serde_json::Value) -> bool {
+    let desired = d["desired_replicas"].as_i64().unwrap_or(0);
+    let status = d["status"].as_str().unwrap_or("");
+    desired > 0 || status != "stopped"
+}
+
+/// Block removal when any non-stopped deployment references an agent-version whose
+/// `agent_name` + `spec_sha256` match this bundle (same registration as `rune run`).
+async fn ensure_no_deployments_using_bundle(
+    base: &str,
+    pkg: &AgentPackage,
+    fingerprint: &str,
+) -> Result<()> {
+    let http = reqwest::Client::new();
+    let (deployments, versions) =
+        crate::commands::agent::fetch_control_plane_state(&http, base).await?;
+
+    let matching_version_ids: HashSet<String> = versions
+        .iter()
+        .filter(|v| {
+            v["agent_name"].as_str() == Some(pkg.spec.name.as_str())
+                && v["spec_sha256"].as_str() == Some(fingerprint)
+        })
+        .filter_map(|v| v["id"].as_str().map(std::string::ToString::to_string))
+        .collect();
+
+    if matching_version_ids.is_empty() {
+        return Ok(());
+    }
+
+    let mut lines: Vec<String> = Vec::new();
+    for d in deployments {
+        let Some(vid) = d["agent_version_id"].as_str() else {
+            continue;
+        };
+        if !matching_version_ids.contains(vid) {
+            continue;
+        }
+        if !deployment_still_active(&d) {
+            continue;
+        }
+        let id = d["id"].as_str().unwrap_or("?");
+        let ns = d["namespace"].as_str().unwrap_or("?");
+        let alias = d["rollout_alias"].as_str().unwrap_or("?");
+        let status = d["status"].as_str().unwrap_or("?");
+        let desired = d["desired_replicas"].as_i64().unwrap_or(0);
+        lines.push(format!(
+            "{id}  namespace={ns}  alias={alias}  status={status}  desired_replicas={desired}"
+        ));
+    }
+
+    if lines.is_empty() {
+        return Ok(());
+    }
+
+    anyhow::bail!(
+        "cannot remove: deployment(s) still use this bundle (same spec as `rune run`):\n  {}\n\
+         Stop or remove those deployments first, or pass --force.",
+        lines.join("\n  ")
+    );
+}
+
+pub async fn remove_cmd(args: ArtifactRemoveArgs) -> Result<()> {
+    let bundle_root = artifact_bundle_dir(&args.name, &args.tag)?;
+
+    if !bundle_root.exists() {
+        anyhow::bail!(
+            "no materialized bundle at {}; run `rune artifact build` first",
+            bundle_root.display()
+        );
+    }
+    if !bundle_root.is_dir() {
+        anyhow::bail!("{} exists but is not a directory", bundle_root.display());
+    }
+    if !is_materialized_bundle(&bundle_root) {
+        anyhow::bail!(
+            "not a materialized bundle at {} (expected agent/manifest.json)",
+            bundle_root.display()
+        );
+    }
+
+    if !args.force {
+        let agent_root = bundle_root.join("agent");
+        let pkg = AgentPackage::load(&agent_root)
+            .with_context(|| format!("load agent from {}", agent_root.display()))?;
+        let fp = crate::commands::run::spec_fingerprint_for_package(&pkg);
+        let base = args.control_plane.trim_end_matches('/');
+        ensure_no_deployments_using_bundle(base, &pkg, &fp)
+            .await
+            .with_context(|| {
+                format!(
+                    "control plane at {base} unreachable; pass --force to remove without checking deployments"
+                )
+            })?;
+    }
+
+    std::fs::remove_dir_all(&bundle_root)
+        .with_context(|| format!("remove {}", bundle_root.display()))?;
+    println!("removed {}", bundle_root.display());
     Ok(())
 }
