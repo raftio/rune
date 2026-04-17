@@ -28,10 +28,7 @@ impl A2aClient {
         let card_url = if url.ends_with("/agent.json") || url.ends_with("/agent-card") {
             url.to_string()
         } else {
-            format!(
-                "{}/.well-known/agent.json",
-                url.trim_end_matches('/')
-            )
+            format!("{}/.well-known/agent.json", url.trim_end_matches('/'))
         };
 
         let resp = self
@@ -73,12 +70,7 @@ impl A2aClient {
             params: serde_json::to_value(&params)?,
         };
 
-        let resp = self
-            .http
-            .post(endpoint)
-            .json(&rpc_req)
-            .send()
-            .await?;
+        let resp = self.http.post(endpoint).json(&rpc_req).send().await?;
 
         let rpc_resp: JsonRpcResponse = resp.json().await?;
 
@@ -116,12 +108,7 @@ impl A2aClient {
             params: serde_json::to_value(&params)?,
         };
 
-        let resp = self
-            .http
-            .post(endpoint)
-            .json(&rpc_req)
-            .send()
-            .await?;
+        let resp = self.http.post(endpoint).json(&rpc_req).send().await?;
 
         let rpc_resp: JsonRpcResponse = resp.json().await?;
 
@@ -141,11 +128,7 @@ impl A2aClient {
     }
 
     /// Cancel a task via JSON-RPC `tasks/cancel`.
-    pub async fn cancel_task(
-        &self,
-        endpoint: &str,
-        task_id: &str,
-    ) -> Result<Task, A2aError> {
+    pub async fn cancel_task(&self, endpoint: &str, task_id: &str) -> Result<Task, A2aError> {
         let params = CancelTaskParams {
             id: task_id.to_string(),
             metadata: None,
@@ -158,12 +141,7 @@ impl A2aClient {
             params: serde_json::to_value(&params)?,
         };
 
-        let resp = self
-            .http
-            .post(endpoint)
-            .json(&rpc_req)
-            .send()
-            .await?;
+        let resp = self.http.post(endpoint).json(&rpc_req).send().await?;
 
         let rpc_resp: JsonRpcResponse = resp.json().await?;
 
@@ -209,8 +187,7 @@ impl A2aClient {
 
                 // Poll until terminal if the server didn't honour blocking=true.
                 let task_id = &task.id;
-                let deadline =
-                    tokio::time::Instant::now() + self.timeout;
+                let deadline = tokio::time::Instant::now() + self.timeout;
                 let mut interval = tokio::time::interval(Duration::from_millis(500));
 
                 loop {

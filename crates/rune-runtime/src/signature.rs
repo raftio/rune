@@ -15,7 +15,8 @@ mod tests {
 
     #[tokio::test]
     async fn empty_string_signature_ref_passes() {
-        let result = verify_image_signature("docker.io/my/agent:latest", "sha256:abc", Some("")).await;
+        let result =
+            verify_image_signature("docker.io/my/agent:latest", "sha256:abc", Some("")).await;
         assert!(result.is_ok());
     }
 

@@ -21,7 +21,10 @@ async fn test_global_agent_card() {
 
     let skills = body["skills"].as_array().expect("skills should be array");
     let names: Vec<&str> = skills.iter().filter_map(|s| s["name"].as_str()).collect();
-    assert!(names.contains(&"weather"), "seeded agent should appear in skills: {names:?}");
+    assert!(
+        names.contains(&"weather"),
+        "seeded agent should appear in skills: {names:?}"
+    );
 }
 
 #[tokio::test]
@@ -38,7 +41,10 @@ async fn test_per_agent_card() {
     let ifaces = body["supportedInterfaces"].as_array().expect("interfaces");
     assert!(!ifaces.is_empty());
     let url = ifaces[0]["url"].as_str().unwrap();
-    assert!(url.contains("/a2a/translator"), "url should contain agent name: {url}");
+    assert!(
+        url.contains("/a2a/translator"),
+        "url should contain agent name: {url}"
+    );
 }
 
 #[tokio::test]
@@ -161,10 +167,7 @@ async fn test_tasks_get() {
         )
         .await;
 
-    let task_id = resp["result"]["id"]
-        .as_str()
-        .expect("task id")
-        .to_string();
+    let task_id = resp["result"]["id"].as_str().expect("task id").to_string();
 
     // Now fetch it.
     let get_resp = srv
@@ -203,14 +206,12 @@ async fn test_tasks_cancel() {
     .await
     .unwrap();
 
-    sqlx::query(
-        "INSERT INTO agent_sessions (id, deployment_id) VALUES (?, ?)",
-    )
-    .bind(&session_id)
-    .bind(&dep_id)
-    .execute(&srv.db)
-    .await
-    .unwrap();
+    sqlx::query("INSERT INTO agent_sessions (id, deployment_id) VALUES (?, ?)")
+        .bind(&session_id)
+        .bind(&dep_id)
+        .execute(&srv.db)
+        .await
+        .unwrap();
 
     sqlx::query(
         "INSERT INTO agent_requests (id, session_id, deployment_id, request_payload, status)
@@ -305,9 +306,15 @@ async fn test_depth_protection() {
         .await;
 
     assert!(resp.get("error").is_some(), "expected depth error: {resp}");
-    assert_eq!(resp["error"]["code"], -32602, "error code should be INVALID_PARAMS");
+    assert_eq!(
+        resp["error"]["code"], -32602,
+        "error code should be INVALID_PARAMS"
+    );
     let msg = resp["error"]["message"].as_str().unwrap_or("");
-    assert!(msg.contains("depth"), "error message should mention depth: {msg}");
+    assert!(
+        msg.contains("depth"),
+        "error message should mention depth: {msg}"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -319,9 +326,7 @@ async fn test_unknown_method() {
     let srv = TestServer::start().await;
     srv.seed_agent("any").await;
 
-    let resp = srv
-        .a2a_rpc("any", "foo/bar", json!({}))
-        .await;
+    let resp = srv.a2a_rpc("any", "foo/bar", json!({})).await;
 
     assert!(resp.get("error").is_some(), "expected error: {resp}");
     assert_eq!(resp["error"]["code"], -32601, "METHOD_NOT_FOUND");

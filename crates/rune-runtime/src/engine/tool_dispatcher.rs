@@ -8,11 +8,11 @@ use uuid::Uuid;
 use rune_network::NetworkRegistry;
 use rune_spec::{ToolDescriptor, ToolRuntime};
 
-use crate::error::RuntimeError;
-use crate::metrics;
 use super::policy::{audit_policy_decision, PolicyDecision, PolicyEngine};
 use super::process_runner;
 use super::wasm_runner::WasmToolRunner;
+use crate::error::RuntimeError;
+use crate::metrics;
 
 const DEFAULT_MAX_AGENT_DEPTH: u32 = 5;
 
@@ -98,12 +98,18 @@ impl ToolDispatcher {
             .clone();
 
         let invocation_id = Uuid::new_v4().to_string();
-        let input_str = serde_json::to_string(&input)
-            .map_err(|e| RuntimeError::Engine(e.to_string()))?;
+        let input_str =
+            serde_json::to_string(&input).map_err(|e| RuntimeError::Engine(e.to_string()))?;
         let runtime_str = format!("{:?}", descriptor.runtime).to_lowercase();
 
         store
-            .insert_tool_invocation(&invocation_id, request_id, &canonical, &runtime_str, &input_str)
+            .insert_tool_invocation(
+                &invocation_id,
+                request_id,
+                &canonical,
+                &runtime_str,
+                &input_str,
+            )
             .await?;
 
         if let Some(ref policy) = self.policy {
@@ -140,31 +146,34 @@ impl ToolDispatcher {
                 }
             }
             ToolRuntime::Process => {
-                let env_map = self.tool_ctx.as_ref().map(|ctx| {
-                    rune_env::AgentEnv::resolve(&ctx.env, None).to_map()
-                });
-                process_runner::run_process(&descriptor, &self.agent_dir, input, env_map.as_ref()).await
+                let env_map = self
+                    .tool_ctx
+                    .as_ref()
+                    .map(|ctx| rune_env::AgentEnv::resolve(&ctx.env, None).to_map());
+                process_runner::run_process(&descriptor, &self.agent_dir, input, env_map.as_ref())
+                    .await
             }
             ToolRuntime::Wasm => {
                 let runner = match self.wasm_runner.clone() {
                     Some(r) => r,
-                    None => Arc::new(
-                        WasmToolRunner::new()
-                            .map_err(|e| RuntimeError::ToolExecution(format!("WasmToolRunner init failed: {e}")))?
-                    ),
+                    None => Arc::new(WasmToolRunner::new().map_err(|e| {
+                        RuntimeError::ToolExecution(format!("WasmToolRunner init failed: {e}"))
+                    })?),
                 };
                 runner.run(&descriptor, &self.agent_dir, input).await
             }
             ToolRuntime::Container => {
-                tracing::warn!(tool = tool_name, "Container tool runtime not yet implemented, returning stub");
+                tracing::warn!(
+                    tool = tool_name,
+                    "Container tool runtime not yet implemented, returning stub"
+                );
                 Ok(serde_json::json!({ "stub": true, "tool": tool_name }))
             }
             ToolRuntime::Agent => {
-                self.dispatch_agent(&descriptor, input, request_id, store).await
+                self.dispatch_agent(&descriptor, input, request_id, store)
+                    .await
             }
-            ToolRuntime::Mcp => {
-                self.dispatch_mcp(&descriptor, input).await
-            }
+            ToolRuntime::Mcp => self.dispatch_mcp(&descriptor, input).await,
         };
 
         let status = if result.is_ok() { "ok" } else { "error" };
@@ -294,9 +303,7 @@ impl ToolDispatcher {
                     .or_else(|| task.text_output().map(|t| serde_json::json!({ "text": t })))
                     .unwrap_or(serde_json::json!({ "completed": true }))
             }
-            rune_a2a::SendMessageResult::Message(msg) => {
-                extract_message_output(msg)
-            }
+            rune_a2a::SendMessageResult::Message(msg) => extract_message_output(msg),
         };
 
         let _ = store
@@ -331,7 +338,8 @@ impl ToolDispatcher {
         })?;
 
         // Strip the `{server_name}/` prefix from the tool name to get the MCP tool name.
-        let mcp_tool_name = descriptor.name
+        let mcp_tool_name = descriptor
+            .name
             .strip_prefix(&format!("{server_name}/"))
             .unwrap_or(&descriptor.name);
 
@@ -344,7 +352,6 @@ impl ToolDispatcher {
         Ok(result.to_value())
     }
 }
-
 
 fn extract_message_output(msg: &rune_a2a::Message) -> serde_json::Value {
     for part in &msg.parts {

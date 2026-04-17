@@ -155,11 +155,7 @@ fn should_skip_rate_limit(path: &str) -> bool {
         .any(|p| path == *p || path.starts_with(p))
 }
 
-pub async fn rate_limit(
-    request: Request,
-    next: Next,
-    limiter: RateLimiter,
-) -> Response {
+pub async fn rate_limit(request: Request, next: Next, limiter: RateLimiter) -> Response {
     let path = request.uri().path();
     if should_skip_rate_limit(path) {
         return next.run(request).await;

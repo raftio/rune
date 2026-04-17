@@ -34,7 +34,11 @@ pub async fn exec(args: RmAgentArgs) -> Result<()> {
             "failed to remove deployment {}: {} {}{}",
             id,
             status,
-            if body.is_empty() { "".into() } else { format!("— {}", body) },
+            if body.is_empty() {
+                "".into()
+            } else {
+                format!("— {}", body)
+            },
             hint,
         );
     }

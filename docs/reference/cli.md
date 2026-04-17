@@ -27,10 +27,12 @@ Deploy a single agent, or invoke one directly.
 **Deploy** — registers the agent with the control plane and starts replicas:
 
 ```bash
-rune run <agent_spec> [--namespace dev] [--alias stable] [--control-plane http://localhost:8081]
+rune run [<agent_spec>] [--file <Runefile.yaml>] [--namespace dev] [--alias stable] [--control-plane http://localhost:8081]
 ```
 
-- `agent_spec`: Path to a `Runefile`, an agent directory, or `git://repo-url[#subdir]`
+- Either `agent_spec` **or** `--file` / `-f` is required (not both).
+- `-f` / `--file`: path to a Runefile YAML (any filename).
+- `agent_spec`: Path to a `Runefile` or agent directory, stored artifact name from `rune artifact ls`, or `git://repo-url[#subdir]`
 
 **Invoke** — send a single prompt to a running agent and print the response:
 

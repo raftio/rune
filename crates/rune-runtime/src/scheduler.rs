@@ -181,7 +181,9 @@ impl SchedulerWorker {
 
             if let Some(next_dt) = schedule.after(&now).next() {
                 let next_str = next_dt.with_timezone(&chrono::Utc).to_rfc3339();
-                self.store.update_schedule_next_run(&row.id, &next_str).await?;
+                self.store
+                    .update_schedule_next_run(&row.id, &next_str)
+                    .await?;
             }
         }
 
@@ -197,12 +199,17 @@ impl SchedulerWorker {
         channel_type: Option<&str>,
         channel_recipient: Option<&str>,
     ) -> Result<(), RuntimeError> {
-        self.store.update_schedule_last_run(schedule_id, now).await?;
+        self.store
+            .update_schedule_last_run(schedule_id, now)
+            .await?;
 
         let deployment_id = self.store.resolve_deployment_for_agent(agent_name).await?;
 
         let Some(deployment_id) = deployment_id else {
-            tracing::warn!(agent = agent_name, "no active deployment for scheduled agent");
+            tracing::warn!(
+                agent = agent_name,
+                "no active deployment for scheduled agent"
+            );
             return Ok(());
         };
 

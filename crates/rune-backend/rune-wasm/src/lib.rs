@@ -46,7 +46,8 @@ impl WasmBackend {
 impl RuntimeBackend for WasmBackend {
     async fn start_replica(&self, deployment: &Deployment) -> Result<Replica, RuntimeError> {
         let backend_instance_id = Uuid::new_v4().to_string();
-        let replica_id = self.store
+        let replica_id = self
+            .store
             .insert_replica(&NewReplica {
                 deployment_id: deployment.id,
                 backend_type: BackendType::Wasm,
@@ -82,13 +83,19 @@ impl RuntimeBackend for WasmBackend {
     }
 
     async fn drain_replica(&self, replica_id: Uuid) -> Result<(), RuntimeError> {
-        self.store.set_replica_state(replica_id, ReplicaState::Draining).await?;
+        self.store
+            .set_replica_state(replica_id, ReplicaState::Draining)
+            .await?;
         tracing::info!(replica_id = %replica_id, "Replica marked draining");
 
         let grace_secs = self.env.drain_grace_secs;
         let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(grace_secs);
         loop {
-            let load = self.store.get_replica_current_load(replica_id).await.unwrap_or(0);
+            let load = self
+                .store
+                .get_replica_current_load(replica_id)
+                .await
+                .unwrap_or(0);
             if load <= 0 {
                 break;
             }
@@ -106,13 +113,11 @@ impl RuntimeBackend for WasmBackend {
         let handle = self.replicas.write().await.remove(&replica_id);
         if let Some(h) = handle {
             let _ = h.shutdown_tx.send(());
-            let _ = tokio::time::timeout(
-                std::time::Duration::from_secs(5),
-                h.task,
-            )
-            .await;
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(5), h.task).await;
         }
-        self.store.set_replica_state(replica_id, ReplicaState::Stopped).await?;
+        self.store
+            .set_replica_state(replica_id, ReplicaState::Stopped)
+            .await?;
         tracing::info!(replica_id = %replica_id, "Replica stopped");
         Ok(())
     }
@@ -137,9 +142,15 @@ impl RuntimeBackend for WasmBackend {
 
     async fn stats(&self, replica_id: Uuid) -> Result<ReplicaStats, RuntimeError> {
         let replicas = self.replicas.read().await;
-        let running = replicas.get(&replica_id).map(|h| h.is_running()).unwrap_or(false);
+        let running = replicas
+            .get(&replica_id)
+            .map(|h| h.is_running())
+            .unwrap_or(false);
         let current_load = if running {
-            self.store.get_replica_current_load(replica_id).await.unwrap_or(0) as u32
+            self.store
+                .get_replica_current_load(replica_id)
+                .await
+                .unwrap_or(0) as u32
         } else {
             0
         };

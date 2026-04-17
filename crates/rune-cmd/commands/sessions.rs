@@ -5,10 +5,7 @@ use std::str::FromStr;
 use crate::cli::SessionsArgs;
 
 /// Resolve id to session_id: try as session first, then as deployment (latest session).
-async fn resolve_session_id(
-    db: &sqlx::sqlite::SqlitePool,
-    id: &str,
-) -> Result<String, String> {
+async fn resolve_session_id(db: &sqlx::sqlite::SqlitePool, id: &str) -> Result<String, String> {
     // 1. Try as session_id
     let exists: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM agent_sessions WHERE id = ?")
         .bind(id)
@@ -32,12 +29,11 @@ async fn resolve_session_id(
     }
 
     // 3. Check if deployment exists (no sessions yet)
-    let dep_exists: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM agent_deployments WHERE id = ?")
-            .bind(id)
-            .fetch_one(db)
-            .await
-            .map_err(|e| e.to_string())?;
+    let dep_exists: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM agent_deployments WHERE id = ?")
+        .bind(id)
+        .fetch_one(db)
+        .await
+        .map_err(|e| e.to_string())?;
     if dep_exists > 0 {
         return Err("deployment has no sessions yet (no requests have been made)".to_string());
     }

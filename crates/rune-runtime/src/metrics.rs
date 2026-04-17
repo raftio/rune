@@ -5,10 +5,7 @@
 
 /// Record request duration in seconds.
 pub fn record_request_duration(agent: &str, status: &str, duration_secs: f64) {
-    let labels = [
-        ("agent", agent.to_string()),
-        ("status", status.to_string()),
-    ];
+    let labels = [("agent", agent.to_string()), ("status", status.to_string())];
     metrics::histogram!("rune_request_duration_seconds", &labels).record(duration_secs);
 }
 
@@ -19,10 +16,7 @@ pub fn record_first_token_latency(secs: f64) {
 
 /// Record tool call duration in seconds.
 pub fn record_tool_call_duration(tool: &str, status: &str, duration_secs: f64) {
-    let labels = [
-        ("tool", tool.to_string()),
-        ("status", status.to_string()),
-    ];
+    let labels = [("tool", tool.to_string()), ("status", status.to_string())];
     metrics::histogram!("rune_tool_call_duration_seconds", &labels).record(duration_secs);
 }
 

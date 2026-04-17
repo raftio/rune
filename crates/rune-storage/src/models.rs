@@ -158,4 +158,3 @@ pub struct AgentVersionImage {
     pub image_digest: String,
     pub signature_ref: Option<String>,
 }
-

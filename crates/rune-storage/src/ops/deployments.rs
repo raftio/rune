@@ -84,22 +84,18 @@ pub async fn get_schedulable(db: &SqlitePool) -> Result<Vec<Deployment>, Storage
 
 /// Create or upsert a deployment. Used by control plane via Raft so it is applied
 /// on the same node that has the agent_version, avoiding FK violations in cluster mode.
-pub async fn create(
-    db: &SqlitePool,
-    input: &CreateDeploymentInput,
-) -> Result<Uuid, StorageError> {
-    let agent_name: String = sqlx::query_scalar(
-        "SELECT agent_name FROM agent_versions WHERE id = ?",
-    )
-    .bind(input.agent_version_id.to_string())
-    .fetch_one(db)
-    .await
-    .map_err(|e| {
-        StorageError::NotFound(format!(
-            "agent_version {} not found (deployment must be routed through Raft): {}",
-            input.agent_version_id, e
-        ))
-    })?;
+pub async fn create(db: &SqlitePool, input: &CreateDeploymentInput) -> Result<Uuid, StorageError> {
+    let agent_name: String =
+        sqlx::query_scalar("SELECT agent_name FROM agent_versions WHERE id = ?")
+            .bind(input.agent_version_id.to_string())
+            .fetch_one(db)
+            .await
+            .map_err(|e| {
+                StorageError::NotFound(format!(
+                    "agent_version {} not found (deployment must be routed through Raft): {}",
+                    input.agent_version_id, e
+                ))
+            })?;
 
     let id = Uuid::new_v4();
     let row: (String,) = sqlx::query_as(
@@ -186,11 +182,7 @@ pub async fn resolve_for_agent(
     Ok(id.and_then(|s| s.parse().ok()))
 }
 
-pub async fn scale(
-    db: &SqlitePool,
-    id: Uuid,
-    desired_replicas: i32,
-) -> Result<u64, StorageError> {
+pub async fn scale(db: &SqlitePool, id: Uuid, desired_replicas: i32) -> Result<u64, StorageError> {
     let affected = sqlx::query(
         "UPDATE agent_deployments
          SET desired_replicas = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')

@@ -21,7 +21,9 @@ pub enum FallbackPolicy {
     Fail,
 }
 
-fn default_token_budget() -> u32 { 100_000 }
+fn default_token_budget() -> u32 {
+    100_000
+}
 
 impl ModelsSpec {}
 
@@ -82,5 +84,4 @@ safety_policy: strict
         assert_eq!(spec.model_mapping.len(), 3);
         assert_eq!(spec.model_mapping["reasoning"], "o1");
     }
-
 }

@@ -1,12 +1,12 @@
 pub mod agent;
 pub mod artifact;
-pub mod debug;
+pub mod chat;
 pub mod cluster;
-pub mod compose;
 pub mod daemon_status;
-pub mod sessions;
+pub mod debug;
 pub mod rm;
 pub mod run;
+pub mod sessions;
 pub mod start;
 pub mod status;
 pub mod stop;

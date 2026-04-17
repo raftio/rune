@@ -58,5 +58,10 @@ pub fn spawn_replica(replica_id: Uuid, engine: Engine) -> WasmReplicaHandle {
         tracing::info!(replica_id = %replica_id, "WASM replica stopped");
     });
 
-    WasmReplicaHandle { replica_id, shutdown_tx, invoke_tx, task }
+    WasmReplicaHandle {
+        replica_id,
+        shutdown_tx,
+        invoke_tx,
+        task,
+    }
 }

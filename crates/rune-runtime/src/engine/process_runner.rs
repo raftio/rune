@@ -59,10 +59,9 @@ pub async fn run_process(
             cmd.envs(env_map);
         }
 
-        let mut child = cmd.spawn()
-            .map_err(|e| RuntimeError::ToolExecution(format!(
-                "failed to spawn '{interpreter}': {e}"
-            )))?;
+        let mut child = cmd.spawn().map_err(|e| {
+            RuntimeError::ToolExecution(format!("failed to spawn '{interpreter}': {e}"))
+        })?;
 
         if let Some(mut stdin) = child.stdin.take() {
             let payload = serde_json::to_vec(&input)

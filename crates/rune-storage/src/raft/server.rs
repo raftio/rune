@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use openraft::raft::{
-    AppendEntriesRequest, InstallSnapshotRequest, VoteRequest,
-};
+use openraft::raft::{AppendEntriesRequest, InstallSnapshotRequest, VoteRequest};
 use openraft::Raft;
 use tonic::{Request, Response, Status};
 
@@ -20,9 +18,7 @@ impl RaftGrpcServer {
         Self { raft }
     }
 
-    pub fn into_service(
-        self,
-    ) -> proto::raft_service_server::RaftServiceServer<Self> {
+    pub fn into_service(self) -> proto::raft_service_server::RaftServiceServer<Self> {
         proto::raft_service_server::RaftServiceServer::new(self)
     }
 }
@@ -39,8 +35,7 @@ impl RaftService for RaftGrpcServer {
 
         let result = self.raft.append_entries(req).await;
 
-        let data = serde_json::to_vec(&result)
-            .map_err(|e| Status::internal(e.to_string()))?;
+        let data = serde_json::to_vec(&result).map_err(|e| Status::internal(e.to_string()))?;
 
         Ok(Response::new(proto::RaftResponse { data }))
     }
@@ -49,14 +44,12 @@ impl RaftService for RaftGrpcServer {
         &self,
         request: Request<proto::RaftRequest>,
     ) -> Result<Response<proto::RaftResponse>, Status> {
-        let req: VoteRequest<u64> =
-            serde_json::from_slice(&request.into_inner().data)
-                .map_err(|e| Status::invalid_argument(e.to_string()))?;
+        let req: VoteRequest<u64> = serde_json::from_slice(&request.into_inner().data)
+            .map_err(|e| Status::invalid_argument(e.to_string()))?;
 
         let result = self.raft.vote(req).await;
 
-        let data = serde_json::to_vec(&result)
-            .map_err(|e| Status::internal(e.to_string()))?;
+        let data = serde_json::to_vec(&result).map_err(|e| Status::internal(e.to_string()))?;
 
         Ok(Response::new(proto::RaftResponse { data }))
     }
@@ -71,8 +64,7 @@ impl RaftService for RaftGrpcServer {
 
         let result = self.raft.install_snapshot(req).await;
 
-        let data = serde_json::to_vec(&result)
-            .map_err(|e| Status::internal(e.to_string()))?;
+        let data = serde_json::to_vec(&result).map_err(|e| Status::internal(e.to_string()))?;
 
         Ok(Response::new(proto::RaftResponse { data }))
     }

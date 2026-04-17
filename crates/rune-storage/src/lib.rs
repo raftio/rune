@@ -242,15 +242,15 @@ impl RuneStore {
         &self,
         input: ops::deployments::CreateDeploymentInput,
     ) -> Result<Uuid, StorageError> {
-        let resp = self
-            .propose(WriteCommand::CreateDeployment(input))
-            .await?;
+        let resp = self.propose(WriteCommand::CreateDeployment(input)).await?;
         Self::expect_id(resp)
     }
 
     /// Write
     pub async fn set_deployment_active(&self, id: Uuid) -> Result<(), StorageError> {
-        let resp = self.propose(WriteCommand::SetDeploymentActive { id }).await?;
+        let resp = self
+            .propose(WriteCommand::SetDeploymentActive { id })
+            .await?;
         Self::expect_ok(resp)
     }
 
@@ -314,18 +314,13 @@ impl RuneStore {
     // =======================================================================
 
     /// Read
-    pub async fn count_healthy_replicas(
-        &self,
-        deployment_id: Uuid,
-    ) -> Result<i64, StorageError> {
+    pub async fn count_healthy_replicas(&self, deployment_id: Uuid) -> Result<i64, StorageError> {
         ops::replicas::count_healthy(&self.db, deployment_id).await
     }
 
     /// Write
     pub async fn insert_replica(&self, r: &NewReplica) -> Result<Uuid, StorageError> {
-        let resp = self
-            .propose(WriteCommand::InsertReplica(r.clone()))
-            .await?;
+        let resp = self.propose(WriteCommand::InsertReplica(r.clone())).await?;
         Self::expect_id(resp)
     }
 
@@ -500,10 +495,7 @@ impl RuneStore {
     }
 
     /// Read
-    pub async fn agent_version_exists(
-        &self,
-        agent_version_id: Uuid,
-    ) -> Result<bool, StorageError> {
+    pub async fn agent_version_exists(&self, agent_version_id: Uuid) -> Result<bool, StorageError> {
         ops::registry::version_exists(&self.db, agent_version_id).await
     }
 
@@ -512,10 +504,7 @@ impl RuneStore {
     // =======================================================================
 
     /// Read
-    pub async fn get_agent_networks(
-        &self,
-        agent_name: &str,
-    ) -> Result<Vec<String>, StorageError> {
+    pub async fn get_agent_networks(&self, agent_name: &str) -> Result<Vec<String>, StorageError> {
         ops::network::get_agent_networks(&self.db, agent_name).await
     }
 
@@ -619,10 +608,7 @@ impl RuneStore {
     }
 
     /// Write
-    pub async fn spawn_agent(
-        &self,
-        agent_name: &str,
-    ) -> Result<(String, String), StorageError> {
+    pub async fn spawn_agent(&self, agent_name: &str) -> Result<(String, String), StorageError> {
         let resp = self
             .propose(WriteCommand::SpawnAgent {
                 agent_name: agent_name.to_string(),
@@ -786,10 +772,7 @@ impl RuntimeStore for RuneStore {
     // Session routing
     // -----------------------------------------------------------------------
 
-    async fn get_session_route(
-        &self,
-        session_id: Uuid,
-    ) -> Result<Option<Uuid>, RuntimeStoreError> {
+    async fn get_session_route(&self, session_id: Uuid) -> Result<Option<Uuid>, RuntimeStoreError> {
         ops::session_route::get(&self.db, session_id)
             .await
             .map_err(Into::into)
@@ -910,10 +893,7 @@ impl RuntimeStore for RuneStore {
         Self::expect_ok(resp).map_err(Into::into)
     }
 
-    async fn get_a2a_task(
-        &self,
-        task_id: &str,
-    ) -> Result<Option<A2aTaskRow>, RuntimeStoreError> {
+    async fn get_a2a_task(&self, task_id: &str) -> Result<Option<A2aTaskRow>, RuntimeStoreError> {
         ops::a2a::get_task(&self.db, task_id)
             .await
             .map_err(Into::into)

@@ -73,7 +73,11 @@ pub fn load_config_file() -> HashMap<String, String> {
         .into_iter()
         .filter_map(|(k, v)| {
             if let toml::Value::String(s) = v {
-                if !s.is_empty() { Some((k, s)) } else { None }
+                if !s.is_empty() {
+                    Some((k, s))
+                } else {
+                    None
+                }
             } else {
                 None
             }
@@ -85,7 +89,9 @@ pub fn load_config_file() -> HashMap<String, String> {
     for (k, v) in &map {
         if std::env::var(k).unwrap_or_default().is_empty() {
             #[allow(deprecated)]
-            unsafe { std::env::set_var(k, v) };
+            unsafe {
+                std::env::set_var(k, v)
+            };
         }
     }
 
@@ -94,7 +100,10 @@ pub fn load_config_file() -> HashMap<String, String> {
 }
 
 fn val<'a>(config: &'a HashMap<String, String>, name: &str) -> Option<&'a str> {
-    config.get(name).map(|s| s.as_str()).filter(|s| !s.is_empty())
+    config
+        .get(name)
+        .map(|s| s.as_str())
+        .filter(|s| !s.is_empty())
 }
 
 fn val_or<'a>(config: &'a HashMap<String, String>, name: &str, default: &'a str) -> &'a str {
@@ -210,7 +219,8 @@ impl PlatformEnv {
     pub fn from_config(config: &HashMap<String, String>) -> Result<Self, EnvError> {
         let env = Self {
             // Gateway
-            gateway_base_url: val_or(config, "GATEWAY_BASE_URL", "http://localhost:3000").to_string(),
+            gateway_base_url: val_or(config, "GATEWAY_BASE_URL", "http://localhost:3000")
+                .to_string(),
             agent_workspace_dir: val(config, "AGENT_WORKSPACE_DIR").map(str::to_string),
             agent_packages_dir: val(config, "AGENT_PACKAGES_DIR").map(str::to_string),
 
@@ -225,9 +235,12 @@ impl PlatformEnv {
             // LLM
             openai_api_key: val(config, "OPENAI_API_KEY").map(|s| Zeroizing::new(s.to_string())),
             openai_model: val_or(config, "OPENAI_MODEL", "gpt-4o-mini").to_string(),
-            openai_base_url: val_or(config, "OPENAI_BASE_URL", "https://api.openai.com").to_string(),
-            anthropic_api_key: val(config, "ANTHROPIC_API_KEY").map(|s| Zeroizing::new(s.to_string())),
-            claude_code_api_key: val(config, "CLAUDE_API_KEY").map(|s| Zeroizing::new(s.to_string())),
+            openai_base_url: val_or(config, "OPENAI_BASE_URL", "https://api.openai.com")
+                .to_string(),
+            anthropic_api_key: val(config, "ANTHROPIC_API_KEY")
+                .map(|s| Zeroizing::new(s.to_string())),
+            claude_code_api_key: val(config, "CLAUDE_API_KEY")
+                .map(|s| Zeroizing::new(s.to_string())),
             gemini_api_key: val(config, "GEMINI_API_KEY").map(|s| Zeroizing::new(s.to_string())),
             gemini_model: val_or(config, "GEMINI_MODEL", "gemini-2.0-flash").to_string(),
             copilot_api_key: val(config, "GITHUB_TOKEN")
@@ -253,7 +266,8 @@ impl PlatformEnv {
             slack_bot_token: val(config, "RUNE_SLACK_BOT_TOKEN").map(str::to_string),
             slack_webhook_url: val(config, "RUNE_SLACK_WEBHOOK_URL").map(str::to_string),
 
-            telegram_bot_token: val(config, "RUNE_TELEGRAM_BOT_TOKEN").map(|s| Zeroizing::new(s.to_string())),
+            telegram_bot_token: val(config, "RUNE_TELEGRAM_BOT_TOKEN")
+                .map(|s| Zeroizing::new(s.to_string())),
 
             discord_bot_token: val(config, "RUNE_DISCORD_BOT_TOKEN").map(str::to_string),
             discord_webhook_url: val(config, "RUNE_DISCORD_WEBHOOK_URL").map(str::to_string),
@@ -266,7 +280,8 @@ impl PlatformEnv {
             mattermost_server_url: val(config, "RUNE_MATTERMOST_SERVER_URL").map(str::to_string),
 
             whatsapp_access_token: val(config, "RUNE_WHATSAPP_ACCESS_TOKEN").map(str::to_string),
-            whatsapp_phone_number_id: val(config, "RUNE_WHATSAPP_PHONE_NUMBER_ID").map(str::to_string),
+            whatsapp_phone_number_id: val(config, "RUNE_WHATSAPP_PHONE_NUMBER_ID")
+                .map(str::to_string),
             whatsapp_verify_token: val(config, "RUNE_WHATSAPP_VERIFY_TOKEN").map(str::to_string),
 
             // SMTP
@@ -324,7 +339,10 @@ mod tests {
     use super::*;
 
     fn cfg(pairs: &[(&str, &str)]) -> HashMap<String, String> {
-        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
     }
 
     #[test]
@@ -375,7 +393,10 @@ mod tests {
         let config = cfg(&[("RUNE_RATE_LIMIT_RPS", "-5")]);
         let result = PlatformEnv::from_config(&config);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("RUNE_RATE_LIMIT_RPS"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("RUNE_RATE_LIMIT_RPS"));
     }
 
     #[test]
@@ -383,7 +404,10 @@ mod tests {
         let config = cfg(&[("RUNE_CANARY_WEIGHT", "1.5")]);
         let result = PlatformEnv::from_config(&config);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("RUNE_CANARY_WEIGHT"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("RUNE_CANARY_WEIGHT"));
     }
 
     #[test]
@@ -391,7 +415,10 @@ mod tests {
         let config = cfg(&[("RUNE_RATE_LIMIT_BURST", "not_a_number")]);
         let result = PlatformEnv::from_config(&config);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("RUNE_RATE_LIMIT_BURST"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("RUNE_RATE_LIMIT_BURST"));
     }
 
     #[test]

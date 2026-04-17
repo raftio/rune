@@ -118,7 +118,10 @@ impl TestServer {
             .await
             .expect("create deployment response parse failed");
 
-        let deployment_id = resp["id"].as_str().expect("deployment id missing").to_string();
+        let deployment_id = resp["id"]
+            .as_str()
+            .expect("deployment id missing")
+            .to_string();
 
         // 3. Force deployment to active (no reconcile loop in tests).
         sqlx::query("UPDATE agent_deployments SET status = 'active' WHERE id = ?")

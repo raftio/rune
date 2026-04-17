@@ -22,7 +22,7 @@ pub struct FileEntry {
 pub struct Manifest {
     pub format: String,
     pub agent_name: String,
-    pub agent_version: String,
+    pub model: String,
     pub created_at: String,
     /// Set to [`INITIATIVE_OPEN_AGENT`] for packs produced by current tooling; omitted in older artifacts.
     #[serde(default, skip_serializing_if = "Option::is_none")]

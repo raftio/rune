@@ -10,7 +10,10 @@ pub async fn register_version(
     Json(req): Json<RegisterVersionInput>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), ControlPlaneError> {
     let row = registry::register(&store, req).await?;
-    Ok((StatusCode::CREATED, Json(serde_json::to_value(&row).unwrap())))
+    Ok((
+        StatusCode::CREATED,
+        Json(serde_json::to_value(&row).unwrap()),
+    ))
 }
 
 pub async fn list_versions(

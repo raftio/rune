@@ -1,9 +1,9 @@
 pub mod a2a;
 pub mod canvas;
+pub mod health;
 pub mod invoke;
 pub mod mcp;
 pub mod sessions;
-pub mod health;
 
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
@@ -22,7 +22,10 @@ struct SharedManagers {
 static SHARED: OnceLock<SharedManagers> = OnceLock::new();
 
 /// Load an agent's ExecutionPlan from the packages directory, falling back to a stub.
-pub fn resolve_plan(agent_name: &str, agent_packages_dir: Option<&str>) -> rune_runtime::ExecutionPlan {
+pub fn resolve_plan(
+    agent_name: &str,
+    agent_packages_dir: Option<&str>,
+) -> rune_runtime::ExecutionPlan {
     if let Some(base_str) = agent_packages_dir {
         let base = PathBuf::from(base_str);
         let candidates = [
@@ -55,7 +58,11 @@ pub fn resolve_plan(agent_name: &str, agent_packages_dir: Option<&str>) -> rune_
     rune_runtime::ExecutionPlan::stub(agent_name)
 }
 
-pub fn shared_tool_context(store: &Arc<RuneStore>, env: &Arc<PlatformEnv>, agent_name: Option<&str>) -> Arc<rune_tools::ToolContext> {
+pub fn shared_tool_context(
+    store: &Arc<RuneStore>,
+    env: &Arc<PlatformEnv>,
+    agent_name: Option<&str>,
+) -> Arc<rune_tools::ToolContext> {
     let managers = SHARED.get_or_init(|| SharedManagers {
         process_manager: Arc::new(ProcessManager::new()),
         browser_manager: Arc::new(BrowserManager::new()),
@@ -65,7 +72,10 @@ pub fn shared_tool_context(store: &Arc<RuneStore>, env: &Arc<PlatformEnv>, agent
 
     Arc::new(rune_tools::ToolContext {
         db: store.pool().clone(),
-        workspace_root: env.agent_workspace_dir.as_ref().map(std::path::PathBuf::from),
+        workspace_root: env
+            .agent_workspace_dir
+            .as_ref()
+            .map(std::path::PathBuf::from),
         process_manager: managers.process_manager.clone(),
         browser_manager: managers.browser_manager.clone(),
         agent_ops: Some(agent_ops),

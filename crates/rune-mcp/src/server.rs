@@ -7,8 +7,8 @@
 use serde_json::Value;
 
 use crate::types::{
-    CallToolResult, InitializeResult, JsonRpcError, JsonRpcRequest,
-    JsonRpcResponse, ListToolsResult, McpTool, ServerInfo, ToolContent,
+    CallToolResult, InitializeResult, JsonRpcError, JsonRpcRequest, JsonRpcResponse,
+    ListToolsResult, McpTool, ServerInfo, ToolContent,
 };
 
 pub const MCP_PROTOCOL_VERSION: &str = "2024-11-05";

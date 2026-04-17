@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use base64::Engine;
 use futures_util::{SinkExt, StreamExt};
-use tokio::sync::{Mutex, oneshot};
+use tokio::sync::{oneshot, Mutex};
 
 use crate::ToolContext;
 
@@ -13,9 +13,7 @@ const DEFAULT_TIMEOUT_MS: u64 = 5_000;
 const SCREENSHOT_DIR: &str = ".rune/screenshots";
 
 type WsSink = futures_util::stream::SplitSink<
-    tokio_tungstenite::WebSocketStream<
-        tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
-    >,
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
     tokio_tungstenite::tungstenite::Message,
 >;
 
@@ -243,10 +241,7 @@ fn find_chrome() -> Result<String, String> {
         }
     }
 
-    Err(
-        "Chrome/Chromium not found. Set CHROME_PATH or install Google Chrome / Chromium."
-            .into(),
-    )
+    Err("Chrome/Chromium not found. Set CHROME_PATH or install Google Chrome / Chromium.".into())
 }
 
 async fn find_free_port() -> u16 {
@@ -366,9 +361,7 @@ pub async fn type_text(
     let selector = input["selector"]
         .as_str()
         .ok_or("Missing 'selector' parameter")?;
-    let text = input["text"]
-        .as_str()
-        .ok_or("Missing 'text' parameter")?;
+    let text = input["text"].as_str().ok_or("Missing 'text' parameter")?;
 
     let cdp = ctx.browser_manager.cdp().await?;
     let focus_js = format!(
@@ -602,9 +595,7 @@ pub async fn back(ctx: &ToolContext) -> Result<serde_json::Value, String> {
         .as_array()
         .ok_or("No navigation entries")?;
     let prev_entry = &entries[(current_index - 1) as usize];
-    let entry_id = prev_entry["id"]
-        .as_i64()
-        .ok_or("No entry ID in history")?;
+    let entry_id = prev_entry["id"].as_i64().ok_or("No entry ID in history")?;
 
     cdp.send(
         "Page.navigateToHistoryEntry",

@@ -2,7 +2,7 @@
 name = "rune-artifact"
 version = "0.1.0"
 edition = "2021"
-description = "Pack and verify Rune agent directories as portable tar.gz artifacts"
+description = "Materialize, export, and verify Rune agent bundles (OAI layout and tar.gz)"
 
 [dependencies]
 rune-spec = { workspace = true }

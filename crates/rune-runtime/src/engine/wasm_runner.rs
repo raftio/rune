@@ -56,8 +56,8 @@ impl WasmToolRunner {
 
         let module = self.get_or_load_module(&path_key, &module_path).await?;
 
-        let input_bytes = serde_json::to_vec(&input)
-            .map_err(|e| RuntimeError::ToolExecution(e.to_string()))?;
+        let input_bytes =
+            serde_json::to_vec(&input).map_err(|e| RuntimeError::ToolExecution(e.to_string()))?;
 
         if input_bytes.len() > MAX_OUTPUT_BYTES {
             return Err(RuntimeError::ToolExecution(format!(
@@ -119,7 +119,6 @@ impl WasmToolRunner {
 
         Ok(module)
     }
-
 }
 
 fn execute_run_sync(
@@ -129,9 +128,8 @@ fn execute_run_sync(
 ) -> Result<serde_json::Value, RuntimeError> {
     let mut store = Store::new(engine, ());
 
-    let instance = Instance::new(&mut store, module, &[]).map_err(|e| {
-        RuntimeError::ToolExecution(format!("failed to instantiate WASM: {e}"))
-    })?;
+    let instance = Instance::new(&mut store, module, &[])
+        .map_err(|e| RuntimeError::ToolExecution(format!("failed to instantiate WASM: {e}")))?;
 
     let memory = instance
         .get_memory(&mut store, "memory")
@@ -153,9 +151,9 @@ fn execute_run_sync(
         .max(64);
     if mem_size < required {
         let pages_needed = (required + page_size - 1) / page_size;
-        memory.grow(&mut store, pages_needed as u64).map_err(|e| {
-            RuntimeError::ToolExecution(format!("WASM memory grow failed: {e}"))
-        })?;
+        memory
+            .grow(&mut store, pages_needed as u64)
+            .map_err(|e| RuntimeError::ToolExecution(format!("WASM memory grow failed: {e}")))?;
     }
 
     {
@@ -163,9 +161,9 @@ fn execute_run_sync(
         mem_bytes[..input.len()].copy_from_slice(input);
     }
 
-    let out_len = run.call(&mut store, (0, input_len, input_len, output_max)).map_err(|e| {
-        RuntimeError::ToolExecution(format!("WASM run() failed: {e}"))
-    })?;
+    let out_len = run
+        .call(&mut store, (0, input_len, input_len, output_max))
+        .map_err(|e| RuntimeError::ToolExecution(format!("WASM run() failed: {e}")))?;
 
     if out_len < 0 {
         let err_slice = {

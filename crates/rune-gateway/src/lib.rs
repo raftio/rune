@@ -1,6 +1,6 @@
-pub mod routes;
 pub mod error;
 pub mod middleware;
+pub mod routes;
 
 pub use error::GatewayError;
 pub use middleware::RateLimiter;
@@ -46,26 +46,44 @@ pub fn router(
     });
 
     let mut app = Router::new()
-        .route("/v1/agents/:agent_name/invoke", post(routes::invoke::invoke))
-        .route("/v1/agents/:agent_name/sessions", post(routes::sessions::create_session))
-        .route("/v1/sessions/:session_id", get(routes::sessions::get_session))
-        .route("/v1/replicas/:replica_id/health", get(routes::health::replica_health))
-        .route("/.well-known/agent.json", get(routes::a2a::agent_card_global))
+        .route(
+            "/v1/agents/:agent_name/invoke",
+            post(routes::invoke::invoke),
+        )
+        .route(
+            "/v1/agents/:agent_name/sessions",
+            post(routes::sessions::create_session),
+        )
+        .route(
+            "/v1/sessions/:session_id",
+            get(routes::sessions::get_session),
+        )
+        .route(
+            "/v1/replicas/:replica_id/health",
+            get(routes::health::replica_health),
+        )
+        .route(
+            "/.well-known/agent.json",
+            get(routes::a2a::agent_card_global),
+        )
         .route("/a2a/:agent_name/agent-card", get(routes::a2a::agent_card))
         .route("/a2a/:agent_name", post(routes::a2a::jsonrpc_handler))
         .route("/canvas/:id", get(routes::canvas::serve_canvas))
         .route("/mcp", post(routes::mcp::handle_mcp));
 
     if let Some(handle) = prometheus_handle {
-        app = app.route("/metrics", get(move || {
-            let h = handle.clone();
-            async move {
-                axum::response::Response::builder()
-                    .header("Content-Type", "text/plain; charset=utf-8")
-                    .body(axum::body::Body::from(h.render()))
-                    .unwrap()
-            }
-        }));
+        app = app.route(
+            "/metrics",
+            get(move || {
+                let h = handle.clone();
+                async move {
+                    axum::response::Response::builder()
+                        .header("Content-Type", "text/plain; charset=utf-8")
+                        .body(axum::body::Body::from(h.render()))
+                        .unwrap()
+                }
+            }),
+        );
     }
 
     app.layer(rate_limit_layer)

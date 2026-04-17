@@ -81,10 +81,7 @@ pub trait RuntimeStore: Send + Sync {
     // Session routing (runtime cache: where is this session routed?)
     // -----------------------------------------------------------------------
 
-    async fn get_session_route(
-        &self,
-        session_id: Uuid,
-    ) -> Result<Option<Uuid>, RuntimeStoreError>;
+    async fn get_session_route(&self, session_id: Uuid) -> Result<Option<Uuid>, RuntimeStoreError>;
 
     async fn set_session_route(
         &self,
@@ -142,10 +139,7 @@ pub trait RuntimeStore: Send + Sync {
         state: &str,
     ) -> Result<(), RuntimeStoreError>;
 
-    async fn get_a2a_task(
-        &self,
-        task_id: &str,
-    ) -> Result<Option<A2aTaskRow>, RuntimeStoreError>;
+    async fn get_a2a_task(&self, task_id: &str) -> Result<Option<A2aTaskRow>, RuntimeStoreError>;
 
     async fn cancel_a2a_task(&self, task_id: &str) -> Result<u64, RuntimeStoreError>;
 

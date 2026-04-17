@@ -43,13 +43,25 @@ pub struct JsonRpcError {
 
 impl JsonRpcError {
     pub fn invalid_request(msg: impl Into<String>) -> Self {
-        Self { code: -32600, message: msg.into(), data: None }
+        Self {
+            code: -32600,
+            message: msg.into(),
+            data: None,
+        }
     }
     pub fn method_not_found(method: &str) -> Self {
-        Self { code: -32601, message: format!("Method not found: {method}"), data: None }
+        Self {
+            code: -32601,
+            message: format!("Method not found: {method}"),
+            data: None,
+        }
     }
     pub fn internal(msg: impl Into<String>) -> Self {
-        Self { code: -32603, message: msg.into(), data: None }
+        Self {
+            code: -32603,
+            message: msg.into(),
+            data: None,
+        }
     }
 }
 
@@ -69,7 +81,7 @@ pub struct McpTool {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolContent {
     #[serde(rename = "type")]
-    pub content_type: String,  // "text" | "image" | "resource"
+    pub content_type: String, // "text" | "image" | "resource"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -78,10 +90,18 @@ pub struct ToolContent {
 
 impl ToolContent {
     pub fn text(s: impl Into<String>) -> Self {
-        Self { content_type: "text".into(), text: Some(s.into()), data: None }
+        Self {
+            content_type: "text".into(),
+            text: Some(s.into()),
+            data: None,
+        }
     }
     pub fn data(v: Value) -> Self {
-        Self { content_type: "text".into(), text: Some(v.to_string()), data: None }
+        Self {
+            content_type: "text".into(),
+            text: Some(v.to_string()),
+            data: None,
+        }
     }
 }
 
@@ -95,17 +115,28 @@ pub struct CallToolResult {
 
 impl CallToolResult {
     pub fn ok(text: impl Into<String>) -> Self {
-        Self { content: vec![ToolContent::text(text)], is_error: false }
+        Self {
+            content: vec![ToolContent::text(text)],
+            is_error: false,
+        }
     }
     pub fn ok_json(v: Value) -> Self {
-        Self { content: vec![ToolContent::data(v)], is_error: false }
+        Self {
+            content: vec![ToolContent::data(v)],
+            is_error: false,
+        }
     }
     pub fn error(msg: impl Into<String>) -> Self {
-        Self { content: vec![ToolContent::text(msg)], is_error: true }
+        Self {
+            content: vec![ToolContent::text(msg)],
+            is_error: true,
+        }
     }
     /// Extract the text/json output as a serde_json::Value.
     pub fn to_value(&self) -> Value {
-        let texts: Vec<&str> = self.content.iter()
+        let texts: Vec<&str> = self
+            .content
+            .iter()
             .filter_map(|c| c.text.as_deref())
             .collect();
         let combined = texts.join("\n");

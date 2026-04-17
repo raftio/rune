@@ -16,8 +16,7 @@ use rune_runtime::{
     backend::ReplicaStats,
     error::RuntimeError,
     models::{BackendType, Deployment, HealthStatus, NewReplica, Replica, ReplicaState},
-    signature,
-    RuntimeBackend,
+    signature, RuntimeBackend,
 };
 
 const CONTAINER_NAME_PREFIX: &str = "rune-agent-";
@@ -30,7 +29,10 @@ pub struct DockerBackend {
 }
 
 impl DockerBackend {
-    pub fn new(store: Arc<RuneStore>, env: Arc<PlatformEnv>) -> Result<Self, bollard::errors::Error> {
+    pub fn new(
+        store: Arc<RuneStore>,
+        env: Arc<PlatformEnv>,
+    ) -> Result<Self, bollard::errors::Error> {
         let docker = Docker::connect_with_local_defaults()?;
         Ok(Self { docker, store, env })
     }
@@ -47,7 +49,8 @@ impl DockerBackend {
 #[async_trait]
 impl RuntimeBackend for DockerBackend {
     async fn start_replica(&self, deployment: &Deployment) -> Result<Replica, RuntimeError> {
-        let image_info = self.store
+        let image_info = self
+            .store
             .get_agent_version_image(deployment.agent_version_id)
             .await
             .map_err(|e| RuntimeError::Backend(format!("storage: {e}")))?
@@ -76,7 +79,8 @@ impl RuntimeBackend for DockerBackend {
 
         let container_name = format!("{CONTAINER_NAME_PREFIX}{}", Uuid::new_v4());
 
-        let replica_id = self.store
+        let replica_id = self
+            .store
             .insert_replica(&NewReplica {
                 deployment_id: deployment.id,
                 backend_type: BackendType::Docker,
@@ -152,13 +156,16 @@ impl RuntimeBackend for DockerBackend {
     }
 
     async fn drain_replica(&self, replica_id: Uuid) -> Result<(), RuntimeError> {
-        let container_id = self.store
+        let container_id = self
+            .store
             .get_replica_backend_instance_id(replica_id)
             .await
             .map_err(|e| RuntimeError::Backend(format!("storage: {e}")))?
             .ok_or_else(|| RuntimeError::Backend("replica not found".into()))?;
 
-        self.store.set_replica_state(replica_id, ReplicaState::Draining).await?;
+        self.store
+            .set_replica_state(replica_id, ReplicaState::Draining)
+            .await?;
 
         self.docker
             .stop_container(
@@ -175,7 +182,8 @@ impl RuntimeBackend for DockerBackend {
     }
 
     async fn stop_replica(&self, replica_id: Uuid) -> Result<(), RuntimeError> {
-        let container_id = self.store
+        let container_id = self
+            .store
             .get_replica_backend_instance_id(replica_id)
             .await
             .map_err(|e| RuntimeError::Backend(format!("storage: {e}")))?;
@@ -183,7 +191,13 @@ impl RuntimeBackend for DockerBackend {
         if let Some(cid) = container_id {
             let _ = self
                 .docker
-                .stop_container(&cid, Some(StopContainerOptions { t: 0, ..Default::default() }))
+                .stop_container(
+                    &cid,
+                    Some(StopContainerOptions {
+                        t: 0,
+                        ..Default::default()
+                    }),
+                )
                 .await;
             let _ = self
                 .docker
@@ -197,13 +211,16 @@ impl RuntimeBackend for DockerBackend {
                 .await;
         }
 
-        self.store.set_replica_state(replica_id, ReplicaState::Stopped).await?;
+        self.store
+            .set_replica_state(replica_id, ReplicaState::Stopped)
+            .await?;
         tracing::info!(replica_id = %replica_id, "Docker replica stopped");
         Ok(())
     }
 
     async fn health(&self, replica_id: Uuid) -> Result<HealthStatus, RuntimeError> {
-        let container_id = self.store
+        let container_id = self
+            .store
             .get_replica_backend_instance_id(replica_id)
             .await
             .map_err(|e| RuntimeError::Backend(format!("storage: {e}")))?;
@@ -236,7 +253,8 @@ impl RuntimeBackend for DockerBackend {
     }
 
     async fn stats(&self, replica_id: Uuid) -> Result<ReplicaStats, RuntimeError> {
-        let container_id = self.store
+        let container_id = self
+            .store
             .get_replica_backend_instance_id(replica_id)
             .await
             .map_err(|e| RuntimeError::Backend(format!("storage: {e}")))?;
@@ -248,7 +266,8 @@ impl RuntimeBackend for DockerBackend {
             });
         };
 
-        let current_load = self.store
+        let current_load = self
+            .store
             .get_replica_current_load(replica_id)
             .await
             .unwrap_or(0) as u32;

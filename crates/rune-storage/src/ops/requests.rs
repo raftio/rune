@@ -66,11 +66,10 @@ pub async fn get_response_summary(
     db: &SqlitePool,
     request_id: &str,
 ) -> Result<Option<String>, StorageError> {
-    let summary: Option<String> = sqlx::query_scalar(
-        "SELECT response_summary FROM agent_requests WHERE id = ?",
-    )
-    .bind(request_id)
-    .fetch_optional(db)
-    .await?;
+    let summary: Option<String> =
+        sqlx::query_scalar("SELECT response_summary FROM agent_requests WHERE id = ?")
+            .bind(request_id)
+            .fetch_optional(db)
+            .await?;
     Ok(summary)
 }

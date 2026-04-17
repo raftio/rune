@@ -45,13 +45,19 @@ impl PolicyEngine {
         if self.models.providers.is_empty() {
             return PolicyDecision::Allow;
         }
-        let actual_model = self.models
+        let actual_model = self
+            .models
             .model_mapping
             .get(model)
             .map(|s| s.as_str())
             .unwrap_or(model);
         let provider = model_to_provider(actual_model);
-        if self.models.providers.iter().any(|p| p.eq_ignore_ascii_case(&provider)) {
+        if self
+            .models
+            .providers
+            .iter()
+            .any(|p| p.eq_ignore_ascii_case(&provider))
+        {
             PolicyDecision::Allow
         } else {
             PolicyDecision::Deny {
@@ -87,9 +93,8 @@ mod tests {
         let models = ModelsSpec {
             providers: providers.iter().map(|s| s.to_string()).collect(),
             model_mapping: HashMap::new(),
-            fallback_policy: rune_spec::models::FallbackPolicy::NextProvider,
+            fallback_policy: rune_spec::FallbackPolicy::NextProvider,
             token_budget: 100_000,
-            safety_policy: rune_spec::models::SafetyPolicy::Standard,
         };
         PolicyEngine::new(tools.iter().map(|s| s.to_string()), models)
     }
@@ -99,14 +104,23 @@ mod tests {
     #[test]
     fn check_tool_empty_allowlist_allows_all() {
         let engine = make_engine(&[], &[]);
-        assert!(matches!(engine.check_tool("anything"), PolicyDecision::Allow));
-        assert!(matches!(engine.check_tool("rune@shell"), PolicyDecision::Allow));
+        assert!(matches!(
+            engine.check_tool("anything"),
+            PolicyDecision::Allow
+        ));
+        assert!(matches!(
+            engine.check_tool("rune@shell"),
+            PolicyDecision::Allow
+        ));
     }
 
     #[test]
     fn check_tool_exact_match_allows() {
         let engine = make_engine(&["my_tool"], &[]);
-        assert!(matches!(engine.check_tool("my_tool"), PolicyDecision::Allow));
+        assert!(matches!(
+            engine.check_tool("my_tool"),
+            PolicyDecision::Allow
+        ));
     }
 
     #[test]
@@ -124,20 +138,29 @@ mod tests {
     fn check_tool_rune_double_underscore_strips_to_canonical() {
         // "rune__shell" → canonical = "shell" → alt = "rune@shell"
         let engine = make_engine(&["rune@shell"], &[]);
-        assert!(matches!(engine.check_tool("rune__shell"), PolicyDecision::Allow));
+        assert!(matches!(
+            engine.check_tool("rune__shell"),
+            PolicyDecision::Allow
+        ));
     }
 
     #[test]
     fn check_tool_rune_at_prefix_allowed_directly() {
         let engine = make_engine(&["rune@file-read"], &[]);
-        assert!(matches!(engine.check_tool("rune@file-read"), PolicyDecision::Allow));
+        assert!(matches!(
+            engine.check_tool("rune@file-read"),
+            PolicyDecision::Allow
+        ));
     }
 
     #[test]
     fn check_tool_canonical_resolves_rune_at_alt() {
         // tool_name "file-read" → no prefix → canonical="file-read" → alt="rune@file-read"
         let engine = make_engine(&["rune@file-read"], &[]);
-        assert!(matches!(engine.check_tool("file-read"), PolicyDecision::Allow));
+        assert!(matches!(
+            engine.check_tool("file-read"),
+            PolicyDecision::Allow
+        ));
     }
 
     #[test]
@@ -154,9 +177,15 @@ mod tests {
     fn check_tool_multiple_tools_in_allowlist() {
         let engine = make_engine(&["tool_a", "rune@shell", "tool_b"], &[]);
         assert!(matches!(engine.check_tool("tool_a"), PolicyDecision::Allow));
-        assert!(matches!(engine.check_tool("rune@shell"), PolicyDecision::Allow));
+        assert!(matches!(
+            engine.check_tool("rune@shell"),
+            PolicyDecision::Allow
+        ));
         assert!(matches!(engine.check_tool("tool_b"), PolicyDecision::Allow));
-        assert!(matches!(engine.check_tool("tool_c"), PolicyDecision::Deny { .. }));
+        assert!(matches!(
+            engine.check_tool("tool_c"),
+            PolicyDecision::Deny { .. }
+        ));
     }
 
     // --- check_model ---
@@ -164,31 +193,58 @@ mod tests {
     #[test]
     fn check_model_empty_providers_allows_all() {
         let engine = make_engine(&[], &[]);
-        assert!(matches!(engine.check_model("claude-sonnet-4-6"), PolicyDecision::Allow));
-        assert!(matches!(engine.check_model("gpt-4o"), PolicyDecision::Allow));
-        assert!(matches!(engine.check_model("unknown-model"), PolicyDecision::Allow));
+        assert!(matches!(
+            engine.check_model("claude-sonnet-4-6"),
+            PolicyDecision::Allow
+        ));
+        assert!(matches!(
+            engine.check_model("gpt-4o"),
+            PolicyDecision::Allow
+        ));
+        assert!(matches!(
+            engine.check_model("unknown-model"),
+            PolicyDecision::Allow
+        ));
     }
 
     #[test]
     fn check_model_claude_maps_to_anthropic() {
         let engine = make_engine(&[], &["anthropic"]);
-        assert!(matches!(engine.check_model("claude-sonnet-4-6"), PolicyDecision::Allow));
-        assert!(matches!(engine.check_model("claude-opus-4-6"), PolicyDecision::Allow));
+        assert!(matches!(
+            engine.check_model("claude-sonnet-4-6"),
+            PolicyDecision::Allow
+        ));
+        assert!(matches!(
+            engine.check_model("claude-opus-4-6"),
+            PolicyDecision::Allow
+        ));
     }
 
     #[test]
     fn check_model_gpt_maps_to_openai() {
         let engine = make_engine(&[], &["openai"]);
-        assert!(matches!(engine.check_model("gpt-4o"), PolicyDecision::Allow));
-        assert!(matches!(engine.check_model("gpt-4o-mini"), PolicyDecision::Allow));
+        assert!(matches!(
+            engine.check_model("gpt-4o"),
+            PolicyDecision::Allow
+        ));
+        assert!(matches!(
+            engine.check_model("gpt-4o-mini"),
+            PolicyDecision::Allow
+        ));
         assert!(matches!(engine.check_model("o1"), PolicyDecision::Allow));
     }
 
     #[test]
     fn check_model_gemini_maps_to_google() {
         let engine = make_engine(&[], &["google"]);
-        assert!(matches!(engine.check_model("gemini-pro"), PolicyDecision::Allow));
-        assert!(matches!(engine.check_model("gemini-1.5-flash"), PolicyDecision::Allow));
+        assert!(matches!(
+            engine.check_model("gemini-pro"),
+            PolicyDecision::Allow
+        ));
+        assert!(matches!(
+            engine.check_model("gemini-1.5-flash"),
+            PolicyDecision::Allow
+        ));
     }
 
     #[test]
@@ -205,7 +261,10 @@ mod tests {
     #[test]
     fn check_model_provider_match_is_case_insensitive() {
         let engine = make_engine(&[], &["Anthropic"]);
-        assert!(matches!(engine.check_model("claude-sonnet-4-6"), PolicyDecision::Allow));
+        assert!(matches!(
+            engine.check_model("claude-sonnet-4-6"),
+            PolicyDecision::Allow
+        ));
     }
 
     #[test]
@@ -218,8 +277,14 @@ mod tests {
     #[test]
     fn check_model_multiple_providers_both_allowed() {
         let engine = make_engine(&[], &["anthropic", "openai"]);
-        assert!(matches!(engine.check_model("claude-sonnet-4-6"), PolicyDecision::Allow));
-        assert!(matches!(engine.check_model("gpt-4o"), PolicyDecision::Allow));
+        assert!(matches!(
+            engine.check_model("claude-sonnet-4-6"),
+            PolicyDecision::Allow
+        ));
+        assert!(matches!(
+            engine.check_model("gpt-4o"),
+            PolicyDecision::Allow
+        ));
     }
 
     #[test]
@@ -231,12 +296,14 @@ mod tests {
             ModelsSpec {
                 providers: vec!["openai".into()],
                 model_mapping,
-                fallback_policy: rune_spec::models::FallbackPolicy::NextProvider,
+                fallback_policy: rune_spec::FallbackPolicy::NextProvider,
                 token_budget: 100_000,
-                safety_policy: rune_spec::models::SafetyPolicy::Standard,
             },
         );
-        assert!(matches!(engine.check_model("default"), PolicyDecision::Allow));
+        assert!(matches!(
+            engine.check_model("default"),
+            PolicyDecision::Allow
+        ));
     }
 }
 

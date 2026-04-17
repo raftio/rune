@@ -92,22 +92,18 @@ pub async fn get_version_image(
     }))
 }
 
-pub async fn check_admission(
-    db: &SqlitePool,
-    agent_version_id: Uuid,
-) -> Result<(), StorageError> {
+pub async fn check_admission(db: &SqlitePool, agent_version_id: Uuid) -> Result<(), StorageError> {
     #[derive(sqlx::FromRow)]
     struct Row {
         image_ref: String,
         image_digest: String,
     }
 
-    let row = sqlx::query_as::<_, Row>(
-        "SELECT image_ref, image_digest FROM agent_versions WHERE id = ?",
-    )
-    .bind(agent_version_id.to_string())
-    .fetch_optional(db)
-    .await?;
+    let row =
+        sqlx::query_as::<_, Row>("SELECT image_ref, image_digest FROM agent_versions WHERE id = ?")
+            .bind(agent_version_id.to_string())
+            .fetch_optional(db)
+            .await?;
 
     let Some(v) = row else {
         return Err(StorageError::NotFound(format!(
@@ -131,15 +127,10 @@ pub async fn check_admission(
     Ok(())
 }
 
-pub async fn version_exists(
-    db: &SqlitePool,
-    agent_version_id: Uuid,
-) -> Result<bool, StorageError> {
-    let count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM agent_versions WHERE id = ?",
-    )
-    .bind(agent_version_id.to_string())
-    .fetch_one(db)
-    .await?;
+pub async fn version_exists(db: &SqlitePool, agent_version_id: Uuid) -> Result<bool, StorageError> {
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM agent_versions WHERE id = ?")
+        .bind(agent_version_id.to_string())
+        .fetch_one(db)
+        .await?;
     Ok(count > 0)
 }

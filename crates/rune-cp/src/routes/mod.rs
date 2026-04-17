@@ -1,2 +1,2 @@
-pub mod registry;
 pub mod deployments;
+pub mod registry;

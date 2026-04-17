@@ -1,7 +1,7 @@
+pub mod browser;
 pub mod defs;
 pub mod memory;
 pub mod process;
-pub mod browser;
 
 use std::path::PathBuf;
 use std::sync::Arc;

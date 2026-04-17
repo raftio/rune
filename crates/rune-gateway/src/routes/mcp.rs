@@ -22,17 +22,17 @@ pub async fn handle_mcp(
         .build()
         .unwrap_or_default();
 
-    let response = rune_mcp::server::handle_request(
-        rpc,
-        agent_tools,
-        move |tool_name, arguments| {
+    let response =
+        rune_mcp::server::handle_request(rpc, agent_tools, move |tool_name, arguments| {
             let http = http.clone();
             let gateway_url = gateway_url.clone();
             async move {
-                let input = arguments.get("input")
+                let input = arguments
+                    .get("input")
                     .cloned()
                     .unwrap_or_else(|| Value::String(arguments.to_string()));
-                let session_id = arguments.get("session_id")
+                let session_id = arguments
+                    .get("session_id")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
 
@@ -41,9 +41,11 @@ pub async fn handle_mcp(
                     body["session_id"] = Value::String(sid);
                 }
 
-                let url = format!("{}/v1/agents/{}/invoke",
+                let url = format!(
+                    "{}/v1/agents/{}/invoke",
                     gateway_url.trim_end_matches('/'),
-                    tool_name);
+                    tool_name
+                );
 
                 http.post(&url)
                     .json(&body)
@@ -54,9 +56,8 @@ pub async fn handle_mcp(
                     .await
                     .map_err(|e| e.to_string())
             }
-        },
-    )
-    .await;
+        })
+        .await;
 
     Json(response)
 }

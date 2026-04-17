@@ -45,10 +45,8 @@ pub struct RuneNetworkConn {
 impl RuneNetworkConn {
     async fn client(
         &self,
-    ) -> Result<
-        proto::raft_service_client::RaftServiceClient<tonic::transport::Channel>,
-        Unreachable,
-    > {
+    ) -> Result<proto::raft_service_client::RaftServiceClient<tonic::transport::Channel>, Unreachable>
+    {
         let url = format!("http://{}", self.addr);
         proto::raft_service_client::RaftServiceClient::connect(url)
             .await
@@ -62,7 +60,8 @@ impl RaftNetwork<RuneTypeConfig> for RuneNetworkConn {
         rpc: AppendEntriesRequest<RuneTypeConfig>,
         _option: RPCOption,
     ) -> Result<AppendEntriesResponse<u64>, RPCError<u64, BasicNode, RaftError<u64>>> {
-        let data = serde_json::to_vec(&rpc).map_err(|e| RPCError::Unreachable(mk_unreachable(e)))?;
+        let data =
+            serde_json::to_vec(&rpc).map_err(|e| RPCError::Unreachable(mk_unreachable(e)))?;
 
         let mut client = self.client().await.map_err(RPCError::Unreachable)?;
 
@@ -83,7 +82,8 @@ impl RaftNetwork<RuneTypeConfig> for RuneNetworkConn {
         rpc: VoteRequest<u64>,
         _option: RPCOption,
     ) -> Result<VoteResponse<u64>, RPCError<u64, BasicNode, RaftError<u64>>> {
-        let data = serde_json::to_vec(&rpc).map_err(|e| RPCError::Unreachable(mk_unreachable(e)))?;
+        let data =
+            serde_json::to_vec(&rpc).map_err(|e| RPCError::Unreachable(mk_unreachable(e)))?;
 
         let mut client = self.client().await.map_err(RPCError::Unreachable)?;
 
@@ -113,9 +113,9 @@ impl RaftNetwork<RuneTypeConfig> for RuneNetworkConn {
 
         let mut data_buf = Vec::new();
         let mut cursor = *snapshot.snapshot;
-        cursor.read_to_end(&mut data_buf).map_err(|e| {
-            openraft::error::StreamingError::Unreachable(mk_unreachable(e))
-        })?;
+        cursor
+            .read_to_end(&mut data_buf)
+            .map_err(|e| openraft::error::StreamingError::Unreachable(mk_unreachable(e)))?;
 
         let install_req: InstallSnapshotRequest<RuneTypeConfig> = InstallSnapshotRequest {
             vote,
@@ -125,25 +125,22 @@ impl RaftNetwork<RuneTypeConfig> for RuneNetworkConn {
             done: true,
         };
 
-        let req_data = serde_json::to_vec(&install_req).map_err(|e| {
-            openraft::error::StreamingError::Unreachable(mk_unreachable(e))
-        })?;
+        let req_data = serde_json::to_vec(&install_req)
+            .map_err(|e| openraft::error::StreamingError::Unreachable(mk_unreachable(e)))?;
 
-        let mut client = self.client().await.map_err(|e| {
-            openraft::error::StreamingError::Unreachable(e)
-        })?;
+        let mut client = self
+            .client()
+            .await
+            .map_err(|e| openraft::error::StreamingError::Unreachable(e))?;
 
         let resp = client
             .install_snapshot(proto::RaftRequest { data: req_data })
             .await
-            .map_err(|e| {
-                openraft::error::StreamingError::Unreachable(mk_unreachable(e))
-            })?;
+            .map_err(|e| openraft::error::StreamingError::Unreachable(mk_unreachable(e)))?;
 
         let result: Result<InstallSnapshotResponse<u64>, RaftError<u64, InstallSnapshotError>> =
-            serde_json::from_slice(&resp.into_inner().data).map_err(|e| {
-                openraft::error::StreamingError::Unreachable(mk_unreachable(e))
-            })?;
+            serde_json::from_slice(&resp.into_inner().data)
+                .map_err(|e| openraft::error::StreamingError::Unreachable(mk_unreachable(e)))?;
 
         match result {
             Ok(resp) => Ok(openraft::raft::SnapshotResponse { vote: resp.vote }),
@@ -164,7 +161,8 @@ impl RaftNetwork<RuneTypeConfig> for RuneNetworkConn {
         InstallSnapshotResponse<u64>,
         RPCError<u64, BasicNode, RaftError<u64, InstallSnapshotError>>,
     > {
-        let data = serde_json::to_vec(&rpc).map_err(|e| RPCError::Unreachable(mk_unreachable(e)))?;
+        let data =
+            serde_json::to_vec(&rpc).map_err(|e| RPCError::Unreachable(mk_unreachable(e)))?;
 
         let mut client = self.client().await.map_err(RPCError::Unreachable)?;
 

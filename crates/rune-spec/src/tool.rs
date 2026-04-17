@@ -56,12 +56,20 @@ pub struct RetryPolicy {
 }
 
 impl Default for RetryPolicy {
-    fn default() -> Self { Self { max_attempts: 1 } }
+    fn default() -> Self {
+        Self { max_attempts: 1 }
+    }
 }
 
-fn default_timeout_ms() -> u64 { 5_000 }
-fn default_max_attempts() -> u32 { 1 }
-fn default_version() -> String { "0.1.0".into() }
+fn default_timeout_ms() -> u64 {
+    5_000
+}
+fn default_max_attempts() -> u32 {
+    1
+}
+fn default_version() -> String {
+    "0.1.0".into()
+}
 
 impl ToolDescriptor {
     pub fn is_builtin(&self) -> bool {
@@ -87,8 +95,8 @@ impl ToolDescriptor {
     }
 
     pub fn load(path: &Path) -> Result<Self, SpecError> {
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| SpecError::Io(path.to_path_buf(), e))?;
+        let content =
+            std::fs::read_to_string(path).map_err(|e| SpecError::Io(path.to_path_buf(), e))?;
         serde_yaml::from_str(&content)
             .map_err(|e| SpecError::Parse(path.display().to_string(), e.to_string()))
     }
@@ -96,9 +104,7 @@ impl ToolDescriptor {
     /// Load all `*.yaml` tool descriptors from a directory.
     pub fn load_dir(dir: &Path) -> Result<Vec<Self>, SpecError> {
         let mut tools = vec![];
-        for entry in std::fs::read_dir(dir)
-            .map_err(|e| SpecError::Io(dir.to_path_buf(), e))?
-        {
+        for entry in std::fs::read_dir(dir).map_err(|e| SpecError::Io(dir.to_path_buf(), e))? {
             let entry = entry.map_err(|e| SpecError::Io(dir.to_path_buf(), e))?;
             let path = entry.path();
             if path.extension().and_then(|e| e.to_str()) == Some("yaml") {
@@ -153,8 +159,14 @@ output_schema_ref: schemas/search_output.json
         assert_eq!(tool.timeout_ms, 8_000);
         assert_eq!(tool.retry_policy.max_attempts, 3);
         assert_eq!(tool.capabilities, vec!["filesystem", "network"]);
-        assert_eq!(tool.input_schema_ref.as_deref(), Some("schemas/search_input.json"));
-        assert_eq!(tool.output_schema_ref.as_deref(), Some("schemas/search_output.json"));
+        assert_eq!(
+            tool.input_schema_ref.as_deref(),
+            Some("schemas/search_input.json")
+        );
+        assert_eq!(
+            tool.output_schema_ref.as_deref(),
+            Some("schemas/search_output.json")
+        );
     }
 
     #[test]

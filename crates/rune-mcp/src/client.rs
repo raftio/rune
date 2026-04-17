@@ -7,8 +7,7 @@ use serde_json::Value;
 
 use crate::error::McpError;
 use crate::types::{
-    CallToolResult, InitializeResult, JsonRpcRequest, JsonRpcResponse,
-    ListToolsResult, McpTool,
+    CallToolResult, InitializeResult, JsonRpcRequest, JsonRpcResponse, ListToolsResult, McpTool,
 };
 
 pub struct McpClient {
@@ -23,7 +22,11 @@ impl McpClient {
             .timeout(Duration::from_secs(30))
             .build()
             .expect("reqwest client");
-        Self { http, url: url.into(), headers }
+        Self {
+            http,
+            url: url.into(),
+            headers,
+        }
     }
 
     async fn send(&self, req: JsonRpcRequest) -> Result<Value, McpError> {
@@ -34,18 +37,24 @@ impl McpClient {
         let resp = builder.send().await?;
         let rpc: JsonRpcResponse = resp.json().await?;
         if let Some(e) = rpc.error {
-            return Err(McpError::Protocol { code: e.code, message: e.message });
+            return Err(McpError::Protocol {
+                code: e.code,
+                message: e.message,
+            });
         }
         Ok(rpc.result.unwrap_or(Value::Null))
     }
 
     /// Perform the MCP handshake.
     pub async fn initialize(&self) -> Result<InitializeResult, McpError> {
-        let req = JsonRpcRequest::new("initialize", serde_json::json!({
-            "protocolVersion": "2024-11-05",
-            "capabilities": {},
-            "clientInfo": { "name": "rune", "version": "0.1.0" }
-        }));
+        let req = JsonRpcRequest::new(
+            "initialize",
+            serde_json::json!({
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": { "name": "rune", "version": "0.1.0" }
+            }),
+        );
         let result = self.send(req).await?;
         serde_json::from_value(result).map_err(McpError::Json)
     }
@@ -64,10 +73,13 @@ impl McpClient {
         name: &str,
         arguments: Value,
     ) -> Result<CallToolResult, McpError> {
-        let req = JsonRpcRequest::new("tools/call", serde_json::json!({
-            "name": name,
-            "arguments": arguments,
-        }));
+        let req = JsonRpcRequest::new(
+            "tools/call",
+            serde_json::json!({
+                "name": name,
+                "arguments": arguments,
+            }),
+        );
         let result = self.send(req).await?;
         serde_json::from_value(result).map_err(McpError::Json)
     }

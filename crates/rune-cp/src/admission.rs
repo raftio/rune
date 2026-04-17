@@ -8,5 +8,8 @@ pub async fn check_deployment(
     store: &Arc<RuneStore>,
     agent_version_id: Uuid,
 ) -> Result<(), ControlPlaneError> {
-    store.check_deployment_admission(agent_version_id).await.map_err(ControlPlaneError::Storage)
+    store
+        .check_deployment_admission(agent_version_id)
+        .await
+        .map_err(ControlPlaneError::Storage)
 }

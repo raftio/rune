@@ -48,7 +48,10 @@ pub async fn exec(args: StatusArgs) -> Result<()> {
             .and_then(|v| v["agent_name"].as_str())
             .unwrap_or("unknown");
 
-        println!("{:<20} {:<12} {:<8} {:<10} {}", agent, alias, ns, status, desired);
+        println!(
+            "{:<20} {:<12} {:<8} {:<10} {}",
+            agent, alias, ns, status, desired
+        );
     }
     Ok(())
 }

@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use uuid::Uuid;
 
-use rune_storage::{RuneStore, RuntimeStore};
 use crate::error::RuntimeError;
+use rune_storage::{RuneStore, RuntimeStore};
 
 pub use rune_storage::{CheckpointBlob, SessionMessage as Message};
 
@@ -21,7 +21,8 @@ impl SessionManager {
         tenant_id: Option<String>,
         routing_key: Option<String>,
     ) -> Result<Uuid, RuntimeError> {
-        Ok(self.store
+        Ok(self
+            .store
             .create_session(deployment_id, tenant_id.as_deref(), routing_key.as_deref())
             .await?)
     }
@@ -37,7 +38,8 @@ impl SessionManager {
         content: serde_json::Value,
         step: i64,
     ) -> Result<(), RuntimeError> {
-        Ok(self.store
+        Ok(self
+            .store
             .append_session_message(session_id, role, &content, step)
             .await?)
     }
@@ -46,10 +48,7 @@ impl SessionManager {
         Ok(self.store.close_session(session_id).await?)
     }
 
-    pub async fn get_deployment_id(
-        &self,
-        session_id: Uuid,
-    ) -> Result<Option<Uuid>, RuntimeError> {
+    pub async fn get_deployment_id(&self, session_id: Uuid) -> Result<Option<Uuid>, RuntimeError> {
         Ok(self.store.get_session_deployment_id(session_id).await?)
     }
 
@@ -59,7 +58,8 @@ impl SessionManager {
         messages: &[Message],
         step: i64,
     ) -> Result<(), RuntimeError> {
-        Ok(self.store
+        Ok(self
+            .store
             .checkpoint_session(session_id, messages, step)
             .await?)
     }
@@ -76,7 +76,8 @@ impl SessionManager {
         session_id: Uuid,
         messages: &[Message],
     ) -> Result<(), RuntimeError> {
-        Ok(self.store
+        Ok(self
+            .store
             .apply_session_restore(session_id, messages)
             .await?)
     }

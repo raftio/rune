@@ -1,4 +1,8 @@
-use axum::{http::StatusCode, response::{IntoResponse, Response}, Json};
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    Json,
+};
 use serde_json::json;
 use thiserror::Error;
 
@@ -33,9 +37,10 @@ impl IntoResponse for ControlPlaneError {
             Self::Conflict(msg) => (StatusCode::CONFLICT, msg.clone()),
             Self::InvalidRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
             Self::Validation(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
-            Self::Database(_) | Self::Internal(_) | Self::Storage(_) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".into())
-            }
+            Self::Database(_) | Self::Internal(_) | Self::Storage(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal server error".into(),
+            ),
         };
         (status, Json(json!({ "error": message }))).into_response()
     }

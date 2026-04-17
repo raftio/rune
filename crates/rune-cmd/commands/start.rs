@@ -2,10 +2,8 @@ use anyhow::{bail, Result};
 use std::sync::Arc;
 
 use rune_env::PlatformEnv;
+use rune_storage::raft::{RaftGrpcServer, RuneNetworkFactory, RuneRaftStore, RuneTypeConfig};
 use rune_storage::{PoolConfig, RuneStore};
-use rune_storage::raft::{
-    RaftGrpcServer, RuneNetworkFactory, RuneRaftStore, RuneTypeConfig,
-};
 
 use crate::cli::StartArgs;
 
@@ -28,7 +26,8 @@ fn daemonize(args: &StartArgs) -> Result<()> {
     let mut cmd = std::process::Command::new(exe);
     cmd.arg("daemon").arg("start").arg("--foreground");
     cmd.arg("--gateway-addr").arg(&args.gateway_addr);
-    cmd.arg("--control-plane-addr").arg(&args.control_plane_addr);
+    cmd.arg("--control-plane-addr")
+        .arg(&args.control_plane_addr);
     cmd.arg("--database-url").arg(&args.database_url);
     cmd.arg("--pid-file").arg(&args.pid_file);
 
@@ -66,7 +65,10 @@ fn daemonize(args: &StartArgs) -> Result<()> {
     println!("  \x1b[32m▲\x1b[0m \x1b[1mRune started\x1b[0m");
     println!();
     println!("    \x1b[2mGateway\x1b[0m         {}", args.gateway_addr);
-    println!("    \x1b[2mControl Plane\x1b[0m   {}", args.control_plane_addr);
+    println!(
+        "    \x1b[2mControl Plane\x1b[0m   {}",
+        args.control_plane_addr
+    );
     println!("    \x1b[2mPID\x1b[0m             {pid}");
     println!("    \x1b[2mPID file\x1b[0m        {}", args.pid_file);
     println!("    \x1b[2mLog file\x1b[0m        {}", args.log_file);
@@ -98,14 +100,12 @@ async fn run_server(args: &StartArgs, platform_env: PlatformEnv) -> Result<()> {
 
         let raft_store = RuneRaftStore::new(store.pool().clone());
 
-        let config = Arc::new(
-            openraft::Config {
-                heartbeat_interval: 500,
-                election_timeout_min: 1500,
-                election_timeout_max: 3000,
-                ..Default::default()
-            },
-        );
+        let config = Arc::new(openraft::Config {
+            heartbeat_interval: 500,
+            election_timeout_min: 1500,
+            election_timeout_max: 3000,
+            ..Default::default()
+        });
 
         let (log_store, state_machine) = openraft::storage::Adaptor::new(raft_store);
         let network = RuneNetworkFactory;
@@ -144,12 +144,14 @@ async fn run_server(args: &StartArgs, platform_env: PlatformEnv) -> Result<()> {
     let store = Arc::new(store);
 
     let backend: Arc<dyn rune_runtime::RuntimeBackend> = match args.backend {
-        crate::cli::BackendChoice::Wasm => {
-            Arc::new(rune_wasm_backend::WasmBackend::new(store.clone(), platform_env.clone())?)
-        }
-        crate::cli::BackendChoice::Docker => {
-            Arc::new(rune_docker_backend::DockerBackend::new(store.clone(), platform_env.clone())?)
-        }
+        crate::cli::BackendChoice::Wasm => Arc::new(rune_wasm_backend::WasmBackend::new(
+            store.clone(),
+            platform_env.clone(),
+        )?),
+        crate::cli::BackendChoice::Docker => Arc::new(rune_docker_backend::DockerBackend::new(
+            store.clone(),
+            platform_env.clone(),
+        )?),
     };
 
     // Leadership-gated workers
@@ -161,10 +163,8 @@ async fn run_server(args: &StartArgs, platform_env: PlatformEnv) -> Result<()> {
                 store.wait_for_leadership().await;
                 tracing::info!("This node is the leader — starting workers");
 
-                let reconcile =
-                    rune_runtime::ReconcileLoop::new(store.clone(), backend.clone());
-                let scheduler =
-                    rune_runtime::scheduler::SchedulerWorker::new(store.clone());
+                let reconcile = rune_runtime::ReconcileLoop::new(store.clone(), backend.clone());
+                let scheduler = rune_runtime::scheduler::SchedulerWorker::new(store.clone());
                 let cache = rune_runtime::SqliteCache::new(store.clone());
 
                 tokio::select! {
@@ -192,7 +192,6 @@ async fn run_server(args: &StartArgs, platform_env: PlatformEnv) -> Result<()> {
         }
     });
 
-
     let gw_router = rune_gateway::router(
         store.clone(),
         Some(backend.clone()),
@@ -211,7 +210,6 @@ async fn run_server(args: &StartArgs, platform_env: PlatformEnv) -> Result<()> {
     let cp = tokio::net::TcpListener::bind(cp_addr).await?;
 
     tokio::try_join!(axum::serve(gw, gw_router), axum::serve(cp, cp_router))?;
-
 
     bail!("server exited unexpectedly");
 }

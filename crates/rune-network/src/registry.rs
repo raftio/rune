@@ -29,9 +29,14 @@ impl NetworkRegistry {
 
         let allowed = NetworkPolicy::check_access(caller_networks, &callee_networks);
         let resource = format!("{caller} -> {callee}");
-        let deny_reason = if allowed { None } else { Some("network isolation policy") };
+        let deny_reason = if allowed {
+            None
+        } else {
+            Some("network isolation policy")
+        };
 
-        if let Err(e) = self.store
+        if let Err(e) = self
+            .store
             .audit_policy_decision("network", &resource, allowed, deny_reason, None)
             .await
         {

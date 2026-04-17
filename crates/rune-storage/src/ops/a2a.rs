@@ -1,5 +1,5 @@
-use sqlx::SqlitePool;
 use rune_store_runtime::{A2aTaskRow, HistoryMessage};
+use sqlx::SqlitePool;
 
 use crate::error::StorageError;
 
@@ -25,11 +25,7 @@ pub async fn insert_task(
     Ok(())
 }
 
-pub async fn update_state(
-    db: &SqlitePool,
-    task_id: &str,
-    state: &str,
-) -> Result<(), StorageError> {
+pub async fn update_state(db: &SqlitePool, task_id: &str, state: &str) -> Result<(), StorageError> {
     sqlx::query(
         "UPDATE a2a_tasks SET state = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
          WHERE task_id = ?",
@@ -41,10 +37,7 @@ pub async fn update_state(
     Ok(())
 }
 
-pub async fn get_task(
-    db: &SqlitePool,
-    task_id: &str,
-) -> Result<Option<A2aTaskRow>, StorageError> {
+pub async fn get_task(db: &SqlitePool, task_id: &str) -> Result<Option<A2aTaskRow>, StorageError> {
     #[derive(sqlx::FromRow)]
     struct Row {
         task_id: String,

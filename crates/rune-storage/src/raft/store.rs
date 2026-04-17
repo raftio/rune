@@ -191,21 +191,22 @@ pub async fn apply_command(
             replica_id,
             payload,
         } => {
-            ops::requests::insert(db, request_id, session_id, deployment_id, replica_id, &payload)
-                .await?;
+            ops::requests::insert(
+                db,
+                request_id,
+                session_id,
+                deployment_id,
+                replica_id,
+                &payload,
+            )
+            .await?;
             Ok(WriteResponse::Ok)
         }
-        WriteCommand::UpdateRequestCompleted {
-            request_id,
-            output,
-        } => {
+        WriteCommand::UpdateRequestCompleted { request_id, output } => {
             ops::requests::update_completed(db, request_id, &output).await?;
             Ok(WriteResponse::Ok)
         }
-        WriteCommand::UpdateRequestStatus {
-            request_id,
-            status,
-        } => {
+        WriteCommand::UpdateRequestStatus { request_id, status } => {
             ops::requests::update_status(db, request_id, &status).await?;
             Ok(WriteResponse::Ok)
         }
@@ -286,8 +287,15 @@ pub async fn apply_command(
             session_id,
             agent_name,
         } => {
-            ops::a2a::insert_task(db, &task_id, &context_id, &request_id, &session_id, &agent_name)
-                .await?;
+            ops::a2a::insert_task(
+                db,
+                &task_id,
+                &context_id,
+                &request_id,
+                &session_id,
+                &agent_name,
+            )
+            .await?;
             Ok(WriteResponse::Ok)
         }
         WriteCommand::UpdateA2ATaskState { task_id, state } => {
@@ -423,10 +431,7 @@ impl RaftStorage<RuneTypeConfig> for RuneRaftStore {
         self.clone()
     }
 
-    async fn append_to_log<I>(
-        &mut self,
-        entries: I,
-    ) -> Result<(), StorageError<u64>>
+    async fn append_to_log<I>(&mut self, entries: I) -> Result<(), StorageError<u64>>
     where
         I: IntoIterator<Item = Entry<RuneTypeConfig>> + Send,
     {
@@ -486,16 +491,15 @@ impl RaftStorage<RuneTypeConfig> for RuneRaftStore {
 
             match &entry.payload {
                 EntryPayload::Normal(cmd) => {
-                    let resp = apply_command(&inner.db, cmd.clone())
-                        .await
-                        .map_err(|e| StorageError::IO {
+                    let resp = apply_command(&inner.db, cmd.clone()).await.map_err(|e| {
+                        StorageError::IO {
                             source: StorageIOError::write(&e),
-                        })?;
+                        }
+                    })?;
                     results.push(resp);
                 }
                 EntryPayload::Membership(mem) => {
-                    inner.last_membership =
-                        StoredMembership::new(Some(entry.log_id), mem.clone());
+                    inner.last_membership = StoredMembership::new(Some(entry.log_id), mem.clone());
                     results.push(WriteResponse::Ok);
                 }
                 EntryPayload::Blank => {
@@ -655,11 +659,11 @@ impl RaftSnapshotBuilder<RuneTypeConfig> for RuneSnapshotBuilder {
             .await
         {
             Ok(_) => {
-                let bytes = tokio::fs::read(&tmp_path).await.map_err(|e| {
-                    StorageError::IO {
+                let bytes = tokio::fs::read(&tmp_path)
+                    .await
+                    .map_err(|e| StorageError::IO {
                         source: StorageIOError::read(&e),
-                    }
-                })?;
+                    })?;
                 let _ = tokio::fs::remove_file(&tmp_path).await;
                 tracing::info!(bytes = bytes.len(), "built snapshot via VACUUM INTO");
                 bytes

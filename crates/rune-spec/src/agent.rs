@@ -1,26 +1,55 @@
 use serde::{Deserialize, Serialize};
 
+use crate::ModelsSpec;
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Arch {
     #[default]
     ReAct,
 }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentSpec {
     pub name: String,
     pub version: String,
     pub instructions: String,
-   #[serde(default)]
+    #[serde(default)]
     pub arch: Arch,
     #[serde(default = "default_max_steps")]
     pub max_steps: u32,
     #[serde(default = "default_timeout_ms")]
     pub timeout_ms: u64,
+    /// Key into `models.model_mapping` for the primary model (e.g. `default`, `fast`).
+    #[serde(default = "default_model_alias")]
+    pub default_model: String,
+    #[serde(default)]
+    pub models: ModelsSpec,
+    /// Built-in (`rune@…`) and custom tool names; merged with tools discovered under `tools/*.yaml`.
+    #[serde(default)]
+    pub toolset: Vec<String>,
+    /// Network memberships for rune-network policy (default: `bridge`).
+    #[serde(default = "default_networks")]
+    pub networks: Vec<String>,
+    /// Remote or local skill refs (`owner/repo/skill-name`); local copies live under `skills/`.
+    #[serde(default)]
+    pub skills: Vec<String>,
 }
 
-fn default_max_steps() -> u32 { 20 }
-fn default_timeout_ms() -> u64 { 30_000 }
+fn default_networks() -> Vec<String> {
+    vec!["bridge".to_string()]
+}
+
+fn default_model_alias() -> String {
+    "default".to_string()
+}
+
+fn default_max_steps() -> u32 {
+    20
+}
+fn default_timeout_ms() -> u64 {
+    30_000
+}
 
 impl AgentSpec {}
 
@@ -29,15 +58,24 @@ mod tests {
     use super::*;
 
     fn minimal_yaml() -> &'static str {
-        "name: test-agent\nversion: 0.1.0\ninstructions: You are a test agent.\ndefault_model: default\n"
+        r"name: test-agent
+version: 0.1.0
+instructions: You are a test agent.
+default_model: default
+models:
+  model_mapping:
+    default: claude-sonnet-4-6
+"
     }
 
     #[test]
-        fn parse_minimal() {
+    fn parse_minimal() {
         let spec: AgentSpec = serde_yaml::from_str(minimal_yaml()).unwrap();
         assert_eq!(spec.name, "test-agent");
         assert_eq!(spec.version, "0.1.0");
         assert_eq!(spec.instructions, "You are a test agent.");
+        assert_eq!(spec.default_model, "default");
+        assert_eq!(spec.models.model_mapping["default"], "claude-sonnet-4-6");
     }
 
     #[test]
@@ -47,6 +85,9 @@ name: my-agent
 version: 1.2.3
 instructions: Do stuff.
 default_model: fast
+models:
+  model_mapping:
+    fast: claude-haiku-4-5
 toolset:
   - rune@file-read
   - my_tool
@@ -64,6 +105,14 @@ routing_hints:
         assert_eq!(spec.version, "1.2.3");
         assert_eq!(spec.max_steps, 50);
         assert_eq!(spec.timeout_ms, 60_000);
+        assert_eq!(
+            spec.toolset,
+            vec!["rune@file-read".to_string(), "my_tool".to_string()]
+        );
+        assert_eq!(
+            spec.networks,
+            vec!["bridge".to_string(), "internal".to_string()]
+        );
     }
 
     #[test]
@@ -72,5 +121,4 @@ routing_hints:
         let err: Result<AgentSpec, _> = serde_yaml::from_str(yaml);
         assert!(err.is_err());
     }
-
 }

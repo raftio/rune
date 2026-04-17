@@ -24,11 +24,7 @@ impl RuntimeAgentOps {
 #[async_trait::async_trait]
 impl AgentOps for RuntimeAgentOps {
     async fn send_message(&self, agent: &str, message: &str) -> Result<serde_json::Value, String> {
-        let endpoint = format!(
-            "{}/a2a/{}",
-            self.gateway_base.trim_end_matches('/'),
-            agent
-        );
+        let endpoint = format!("{}/a2a/{}", self.gateway_base.trim_end_matches('/'), agent);
 
         let client = rune_a2a::A2aClient::new(Duration::from_secs(60));
         let msg = rune_a2a::Message {
@@ -75,7 +71,11 @@ impl AgentOps for RuntimeAgentOps {
     }
 
     async fn list_agents(&self) -> Result<serde_json::Value, String> {
-        let rows = self.store.list_agents().await.map_err(|e| format!("Failed to list agents: {e}"))?;
+        let rows = self
+            .store
+            .list_agents()
+            .await
+            .map_err(|e| format!("Failed to list agents: {e}"))?;
 
         let agents: Vec<serde_json::Value> = rows
             .into_iter()
@@ -94,13 +94,15 @@ impl AgentOps for RuntimeAgentOps {
     }
 
     async fn find_agent(&self, query: &str) -> Result<serde_json::Value, String> {
-        let rows = self.store.find_agents(query).await.map_err(|e| format!("Failed to find agents: {e}"))?;
+        let rows = self
+            .store
+            .find_agents(query)
+            .await
+            .map_err(|e| format!("Failed to find agents: {e}"))?;
 
         let agents: Vec<serde_json::Value> = rows
             .into_iter()
-            .map(|r| {
-                serde_json::json!({ "id": r.id, "name": r.agent_name, "status": r.status })
-            })
+            .map(|r| serde_json::json!({ "id": r.id, "name": r.agent_name, "status": r.status }))
             .collect();
 
         Ok(serde_json::json!({ "results": agents, "query": query }))
@@ -110,12 +112,10 @@ impl AgentOps for RuntimeAgentOps {
         let spec: serde_json::Value =
             serde_yaml::from_str(manifest).map_err(|e| format!("Invalid manifest: {e}"))?;
 
-        let agent_name = spec["name"]
-            .as_str()
-            .unwrap_or("unnamed-agent")
-            .to_string();
+        let agent_name = spec["name"].as_str().unwrap_or("unnamed-agent").to_string();
 
-        let (_version_id, deployment_id) = self.store
+        let (_version_id, deployment_id) = self
+            .store
             .spawn_agent(&agent_name)
             .await
             .map_err(|e| format!("Failed to spawn agent: {e}"))?;
@@ -128,7 +128,8 @@ impl AgentOps for RuntimeAgentOps {
     }
 
     async fn kill_agent(&self, agent_id: &str) -> Result<serde_json::Value, String> {
-        let affected = self.store
+        let affected = self
+            .store
             .kill_agent(agent_id)
             .await
             .map_err(|e| format!("Failed to kill agent: {e}"))?;

@@ -21,10 +21,7 @@ impl AgentEnv {
         let mut vars = HashMap::new();
 
         // Platform vars that agent processes/containers typically need
-        vars.insert(
-            "GATEWAY_BASE_URL".into(),
-            platform.gateway_base_url.clone(),
-        );
+        vars.insert("GATEWAY_BASE_URL".into(), platform.gateway_base_url.clone());
         if let Some(dir) = &platform.agent_workspace_dir {
             vars.insert("AGENT_WORKSPACE_DIR".into(), dir.clone());
         }
@@ -48,7 +45,10 @@ impl AgentEnv {
 
     /// Format suitable for `Vec<(String, String)>`, e.g. `Command::envs()`.
     pub fn to_vec(&self) -> Vec<(String, String)> {
-        self.vars.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+        self.vars
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
     }
 
     /// Format suitable for Docker/bollard: `Vec<String>` of `"KEY=VALUE"`.
@@ -155,7 +155,9 @@ mod tests {
         let docker_env = agent.to_docker_env();
 
         assert!(docker_env.iter().any(|e| e == "FOO=bar"));
-        assert!(docker_env.iter().any(|e| e.starts_with("GATEWAY_BASE_URL=")));
+        assert!(docker_env
+            .iter()
+            .any(|e| e.starts_with("GATEWAY_BASE_URL=")));
     }
 
     #[test]
@@ -164,7 +166,9 @@ mod tests {
         let agent = AgentEnv::resolve(&platform, None);
         let vec = agent.to_vec();
 
-        assert!(vec.iter().any(|(k, v)| k == "GATEWAY_BASE_URL" && v == "http://test:3000"));
+        assert!(vec
+            .iter()
+            .any(|(k, v)| k == "GATEWAY_BASE_URL" && v == "http://test:3000"));
     }
 
     #[test]

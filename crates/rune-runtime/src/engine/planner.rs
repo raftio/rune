@@ -3,11 +3,11 @@ use uuid::Uuid;
 use crate::error::RuntimeError;
 use crate::metrics;
 
-use super::llm::{ContentBlock, LlmClient, tools_to_api, user_input_to_content};
+use super::llm::{tools_to_api, user_input_to_content, ContentBlock, LlmClient};
+use super::loader::ExecutionPlan;
 use super::policy::{PolicyDecision, PolicyEngine};
 use super::session::{Message, SessionManager};
 use super::tool_dispatcher::ToolDispatcher;
-use super::loader::ExecutionPlan;
 
 // ---------------------------------------------------------------------------
 // Action
@@ -15,9 +15,17 @@ use super::loader::ExecutionPlan;
 
 #[derive(Debug)]
 pub enum Action {
-    Respond { content: serde_json::Value },
-    CallTool { id: String, name: String, input: serde_json::Value },
-    Finish { reason: String },
+    Respond {
+        content: serde_json::Value,
+    },
+    CallTool {
+        id: String,
+        name: String,
+        input: serde_json::Value,
+    },
+    Finish {
+        reason: String,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -81,8 +89,13 @@ impl Planner {
             });
         }
 
-        if let PolicyDecision::Deny { reason } = self.model_policy.check_model(self.plan.default_model.as_str()) {
-            return Err(RuntimeError::Engine(format!("model policy denied: {reason}")));
+        if let PolicyDecision::Deny { reason } = self
+            .model_policy
+            .check_model(self.plan.default_model.as_str())
+        {
+            return Err(RuntimeError::Engine(format!(
+                "model policy denied: {reason}"
+            )));
         }
 
         let api_messages = Self::to_api_messages(messages);
@@ -114,8 +127,16 @@ impl Planner {
                 })
             }
             _ => {
-                let text = resp.content.iter()
-                    .filter_map(|b| if let ContentBlock::Text { text } = b { Some(text.as_str()) } else { None })
+                let text = resp
+                    .content
+                    .iter()
+                    .filter_map(|b| {
+                        if let ContentBlock::Text { text } = b {
+                            Some(text.as_str())
+                        } else {
+                            None
+                        }
+                    })
                     .collect::<Vec<_>>()
                     .join("\n");
 
@@ -146,15 +167,18 @@ impl Planner {
         let mut messages = sessions.load_messages(session_id).await?;
         let step = messages.len() as i64;
         let user_content = user_input_to_content(&user_input);
-        sessions.append_message(session_id, "user", user_content, step).await?;
+        sessions
+            .append_message(session_id, "user", user_content, step)
+            .await?;
         messages = sessions.load_messages(session_id).await?;
 
         let mut current_step: u32 = 0;
         loop {
             match self.next_action(client, &messages, current_step).await? {
                 Action::Respond { content } => {
-                    let blocks = content.get("_blocks").cloned()
-                        .unwrap_or(serde_json::json!([{"type":"text","text": content.to_string()}]));
+                    let blocks = content.get("_blocks").cloned().unwrap_or(
+                        serde_json::json!([{"type":"text","text": content.to_string()}]),
+                    );
                     sessions
                         .append_message(session_id, "assistant", blocks, messages.len() as i64)
                         .await?;
@@ -163,7 +187,8 @@ impl Planner {
                     if let Err(e) = sessions.checkpoint(session_id, &messages, step).await {
                         tracing::error!(session_id = %session_id, error = %e, "checkpoint failed — session history may be incomplete");
                     }
-                    let text = content.get("text")
+                    let text = content
+                        .get("text")
                         .and_then(|v| v.as_str())
                         .unwrap_or_default()
                         .to_string();
@@ -175,7 +200,12 @@ impl Planner {
                         "type": "tool_use", "id": id, "name": name, "input": input,
                     }]);
                     sessions
-                        .append_message(session_id, "assistant", assistant_blocks, messages.len() as i64)
+                        .append_message(
+                            session_id,
+                            "assistant",
+                            assistant_blocks,
+                            messages.len() as i64,
+                        )
                         .await?;
 
                     let result = tools.dispatch(&name, input, request_id, store).await?;
@@ -216,7 +246,9 @@ pub struct StubPlanner {
 
 impl StubPlanner {
     pub fn new(agent_name: impl Into<String>) -> Self {
-        Self { agent_name: agent_name.into() }
+        Self {
+            agent_name: agent_name.into(),
+        }
     }
 
     pub async fn run(
@@ -226,12 +258,16 @@ impl StubPlanner {
         user_input: serde_json::Value,
     ) -> Result<serde_json::Value, RuntimeError> {
         let step = sessions.load_messages(session_id).await?.len() as i64;
-        sessions.append_message(session_id, "user", user_input.clone(), step).await?;
+        sessions
+            .append_message(session_id, "user", user_input.clone(), step)
+            .await?;
         let reply = serde_json::json!({
             "text": format!("[stub] echo from {}: {}", self.agent_name, user_input),
             "note": "Set ANTHROPIC_API_KEY or OPENAI_API_KEY to enable real LLM responses"
         });
-        sessions.append_message(session_id, "assistant", reply.clone(), step + 1).await?;
+        sessions
+            .append_message(session_id, "assistant", reply.clone(), step + 1)
+            .await?;
         Ok(reply)
     }
 }
@@ -243,15 +279,27 @@ impl StubPlanner {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SseEvent {
-    Token { text: String },
-    ToolStart { name: String },
-    ToolDone { name: String, result: serde_json::Value },
-    Done { session_id: String, request_id: String },
-    Error { message: String },
+    Token {
+        text: String,
+    },
+    ToolStart {
+        name: String,
+    },
+    ToolDone {
+        name: String,
+        result: serde_json::Value,
+    },
+    Done {
+        session_id: String,
+        request_id: String,
+    },
+    Error {
+        message: String,
+    },
 }
 
-use serde::Serialize;
 use super::llm::StreamChunk;
+use serde::Serialize;
 
 #[cfg(test)]
 mod tests {
@@ -298,7 +346,8 @@ mod tests {
 
     #[test]
     fn tool_message_maps_to_tool_role() {
-        let content = serde_json::json!([{"type": "tool_result", "tool_use_id": "id1", "content": "ok"}]);
+        let content =
+            serde_json::json!([{"type": "tool_result", "tool_use_id": "id1", "content": "ok"}]);
         let msg = make_message("tool", content);
         let out = Planner::to_api_messages(&[msg]);
         assert_eq!(out[0]["role"], "tool");
@@ -324,7 +373,10 @@ mod tests {
         let msgs = vec![
             make_message("user", serde_json::json!("first")),
             make_message("assistant", serde_json::json!("second")),
-            make_message("tool", serde_json::json!([{"type":"tool_result","tool_use_id":"x","content":"ok"}])),
+            make_message(
+                "tool",
+                serde_json::json!([{"type":"tool_result","tool_use_id":"x","content":"ok"}]),
+            ),
         ];
         let out = Planner::to_api_messages(&msgs);
         assert_eq!(out.len(), 3);
@@ -343,7 +395,9 @@ mod tests {
 
     #[test]
     fn sse_token_serializes_with_type_field() {
-        let ev = SseEvent::Token { text: "hello".into() };
+        let ev = SseEvent::Token {
+            text: "hello".into(),
+        };
         let json = serde_json::to_value(&ev).unwrap();
         assert_eq!(json["type"], "token");
         assert_eq!(json["text"], "hello");
@@ -351,7 +405,9 @@ mod tests {
 
     #[test]
     fn sse_tool_start_serializes_correctly() {
-        let ev = SseEvent::ToolStart { name: "rune__shell".into() };
+        let ev = SseEvent::ToolStart {
+            name: "rune__shell".into(),
+        };
         let json = serde_json::to_value(&ev).unwrap();
         assert_eq!(json["type"], "tool_start");
         assert_eq!(json["name"], "rune__shell");
@@ -383,7 +439,9 @@ mod tests {
 
     #[test]
     fn sse_error_serializes_correctly() {
-        let ev = SseEvent::Error { message: "something failed".into() };
+        let ev = SseEvent::Error {
+            message: "something failed".into(),
+        };
         let json = serde_json::to_value(&ev).unwrap();
         assert_eq!(json["type"], "error");
         assert_eq!(json["message"], "something failed");
@@ -404,7 +462,6 @@ mod tests {
     }
 }
 
-
 impl Planner {
     /// Streaming version of `run()`. Sends `SseEvent`s to `tx` as tokens arrive.
     pub async fn run_stream(
@@ -421,7 +478,12 @@ impl Planner {
         // Append user turn.
         let mut messages = sessions.load_messages(session_id).await?;
         sessions
-            .append_message(session_id, "user", user_input_to_content(&user_input), messages.len() as i64)
+            .append_message(
+                session_id,
+                "user",
+                user_input_to_content(&user_input),
+                messages.len() as i64,
+            )
             .await?;
         messages = sessions.load_messages(session_id).await?;
 
@@ -431,19 +493,24 @@ impl Planner {
         loop {
             if current_step >= self.plan.max_steps {
                 metrics::increment_streaming_events();
-                let _ = tx.send(SseEvent::Done {
-                    session_id: session_id.to_string(),
-                    request_id: request_id.to_string(),
-                }).await;
+                let _ = tx
+                    .send(SseEvent::Done {
+                        session_id: session_id.to_string(),
+                        request_id: request_id.to_string(),
+                    })
+                    .await;
                 return Ok(());
             }
 
-            if let PolicyDecision::Deny { reason } =
-                self.model_policy.check_model(self.plan.default_model.as_str())
+            if let PolicyDecision::Deny { reason } = self
+                .model_policy
+                .check_model(self.plan.default_model.as_str())
             {
-                let _ = tx.send(SseEvent::Error {
-                    message: format!("model policy denied: {reason}"),
-                }).await;
+                let _ = tx
+                    .send(SseEvent::Error {
+                        message: format!("model policy denied: {reason}"),
+                    })
+                    .await;
                 return Ok(());
             }
 
@@ -455,34 +522,43 @@ impl Planner {
             let mut stop_reason = "end_turn".to_string();
             let mut stream_err: Option<String> = None;
 
-            client.stream(
-                Some(&self.plan.default_model),
-                &self.plan.instructions,
-                &api_messages,
-                &api_tools,
-                4096,
-                &mut |chunk| {
-                    match chunk {
-                        StreamChunk::Token(text) => {
-                            full_text.push_str(&text);
-                            metrics::increment_streaming_events();
-                            // try_send: drop token if SSE buffer full (non-fatal)
-                            let _ = tx.try_send(SseEvent::Token { text });
+            client
+                .stream(
+                    Some(&self.plan.default_model),
+                    &self.plan.instructions,
+                    &api_messages,
+                    &api_tools,
+                    4096,
+                    &mut |chunk| {
+                        match chunk {
+                            StreamChunk::Token(text) => {
+                                full_text.push_str(&text);
+                                metrics::increment_streaming_events();
+                                // try_send: drop token if SSE buffer full (non-fatal)
+                                let _ = tx.try_send(SseEvent::Token { text });
+                            }
+                            StreamChunk::ToolUse { id, name, input } => {
+                                tool_calls.push((id, name, input));
+                            }
+                            StreamChunk::Done {
+                                stop_reason: sr,
+                                full_text: ft,
+                            } => {
+                                stop_reason = sr;
+                                if full_text.is_empty() {
+                                    full_text = ft;
+                                }
+                            }
+                            StreamChunk::Error(msg) => {
+                                let _ = tx.try_send(SseEvent::Error {
+                                    message: msg.clone(),
+                                });
+                                stream_err = Some(msg);
+                            }
                         }
-                        StreamChunk::ToolUse { id, name, input } => {
-                            tool_calls.push((id, name, input));
-                        }
-                        StreamChunk::Done { stop_reason: sr, full_text: ft } => {
-                            stop_reason = sr;
-                            if full_text.is_empty() { full_text = ft; }
-                        }
-                        StreamChunk::Error(msg) => {
-                            let _ = tx.try_send(SseEvent::Error { message: msg.clone() });
-                            stream_err = Some(msg);
-                        }
-                    }
-                },
-            ).await?;
+                    },
+                )
+                .await?;
 
             if stream_err.is_some() {
                 return Ok(());
@@ -494,15 +570,27 @@ impl Planner {
                     serde_json::json!({"type":"tool_use","id":id,"name":name,"input":input})
                 }).collect();
                 sessions
-                    .append_message(session_id, "assistant", serde_json::json!(blocks), messages.len() as i64)
+                    .append_message(
+                        session_id,
+                        "assistant",
+                        serde_json::json!(blocks),
+                        messages.len() as i64,
+                    )
                     .await?;
 
                 for (id, name, input) in &tool_calls {
                     metrics::increment_streaming_events();
                     let _ = tx.send(SseEvent::ToolStart { name: name.clone() }).await;
-                    let result = tools.dispatch(name, input.clone(), request_id, store).await?;
+                    let result = tools
+                        .dispatch(name, input.clone(), request_id, store)
+                        .await?;
                     metrics::increment_streaming_events();
-                    let _ = tx.send(SseEvent::ToolDone { name: name.clone(), result: result.clone() }).await;
+                    let _ = tx
+                        .send(SseEvent::ToolDone {
+                            name: name.clone(),
+                            result: result.clone(),
+                        })
+                        .await;
 
                     let tool_result = serde_json::json!([{
                         "type": "tool_result",
@@ -528,10 +616,12 @@ impl Planner {
                     tracing::error!(session_id = %session_id, error = %e, "checkpoint failed in stream — session history may be incomplete");
                 }
                 metrics::increment_streaming_events();
-                let _ = tx.send(SseEvent::Done {
-                    session_id: session_id.to_string(),
-                    request_id: request_id.to_string(),
-                }).await;
+                let _ = tx
+                    .send(SseEvent::Done {
+                        session_id: session_id.to_string(),
+                        request_id: request_id.to_string(),
+                    })
+                    .await;
                 return Ok(());
             }
         }

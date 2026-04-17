@@ -9,9 +9,15 @@ pub async fn register(
     store: &Arc<RuneStore>,
     req: RegisterVersionInput,
 ) -> Result<AgentVersionRow, ControlPlaneError> {
-    store.register_agent_version(&req).await.map_err(ControlPlaneError::Storage)
+    store
+        .register_agent_version(&req)
+        .await
+        .map_err(ControlPlaneError::Storage)
 }
 
 pub async fn list(store: &Arc<RuneStore>) -> Result<Vec<AgentVersionRow>, ControlPlaneError> {
-    store.list_agent_versions().await.map_err(ControlPlaneError::Storage)
+    store
+        .list_agent_versions()
+        .await
+        .map_err(ControlPlaneError::Storage)
 }

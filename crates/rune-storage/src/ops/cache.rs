@@ -10,13 +10,12 @@ pub async fn get_replica_load(
     db: &SqlitePool,
     replica_id: Uuid,
 ) -> Result<Option<i32>, StorageError> {
-    let row: Option<String> = sqlx::query_scalar(
-        "SELECT value FROM rune_cache WHERE namespace = ? AND key = ?",
-    )
-    .bind(REPLICA_LOAD_NS)
-    .bind(replica_id.to_string())
-    .fetch_optional(db)
-    .await?;
+    let row: Option<String> =
+        sqlx::query_scalar("SELECT value FROM rune_cache WHERE namespace = ? AND key = ?")
+            .bind(REPLICA_LOAD_NS)
+            .bind(replica_id.to_string())
+            .fetch_optional(db)
+            .await?;
     Ok(row.and_then(|s| s.parse().ok()))
 }
 
@@ -54,12 +53,11 @@ pub async fn rate_limit_check(
         window_start: String,
     }
 
-    let row: Option<Row> = sqlx::query_as(
-        "SELECT count, window_start FROM rune_rate_limits WHERE key = ?",
-    )
-    .bind(key)
-    .fetch_optional(db)
-    .await?;
+    let row: Option<Row> =
+        sqlx::query_as("SELECT count, window_start FROM rune_rate_limits WHERE key = ?")
+            .bind(key)
+            .fetch_optional(db)
+            .await?;
 
     let (count, window_start) = match row {
         Some(r) if r.window_start >= cutoff => (r.count, r.window_start),

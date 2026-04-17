@@ -22,20 +22,45 @@ openraft::declare_raft_types!(
 pub enum WriteCommand {
     // -- Deployments --
     CreateDeployment(crate::ops::deployments::CreateDeploymentInput),
-    SetDeploymentActive { id: Uuid },
-    ScaleDeployment { id: Uuid, replicas: i32 },
-    DeleteDeployment { id: Uuid },
-    DeleteDeploymentForce { id: Uuid },
+    SetDeploymentActive {
+        id: Uuid,
+    },
+    ScaleDeployment {
+        id: Uuid,
+        replicas: i32,
+    },
+    DeleteDeployment {
+        id: Uuid,
+    },
+    DeleteDeploymentForce {
+        id: Uuid,
+    },
 
     // -- Replicas --
     InsertReplica(NewReplica),
-    SetReplicaReady { id: Uuid },
-    SetReplicaState { id: Uuid, state: ReplicaState },
-    HeartbeatReplica { id: Uuid },
-    MarkStaleReplicasFailed { threshold_secs: i64 },
-    IncrementReplicaLoad { id: Uuid },
-    DecrementReplicaLoad { id: Uuid },
-    UpdateReplicaBackendInstanceId { id: Uuid, container_id: String },
+    SetReplicaReady {
+        id: Uuid,
+    },
+    SetReplicaState {
+        id: Uuid,
+        state: ReplicaState,
+    },
+    HeartbeatReplica {
+        id: Uuid,
+    },
+    MarkStaleReplicasFailed {
+        threshold_secs: i64,
+    },
+    IncrementReplicaLoad {
+        id: Uuid,
+    },
+    DecrementReplicaLoad {
+        id: Uuid,
+    },
+    UpdateReplicaBackendInstanceId {
+        id: Uuid,
+        container_id: String,
+    },
 
     // -- Sessions --
     CreateSession {
@@ -43,14 +68,19 @@ pub enum WriteCommand {
         tenant_id: Option<String>,
         routing_key: Option<String>,
     },
-    CloseSession { id: Uuid },
+    CloseSession {
+        id: Uuid,
+    },
     AppendSessionMessage {
         session_id: Uuid,
         role: String,
         content: serde_json::Value,
         step: i64,
     },
-    AssignSessionReplica { session_id: Uuid, replica_id: Uuid },
+    AssignSessionReplica {
+        session_id: Uuid,
+        replica_id: Uuid,
+    },
     CheckpointSession {
         session_id: Uuid,
         messages: Vec<SessionMessage>,
@@ -119,8 +149,13 @@ pub enum WriteCommand {
         session_id: String,
         agent_name: String,
     },
-    UpdateA2ATaskState { task_id: String, state: String },
-    CancelA2ATask { task_id: String },
+    UpdateA2ATaskState {
+        task_id: String,
+        state: String,
+    },
+    CancelA2ATask {
+        task_id: String,
+    },
 
     // -- Cache --
     SetSessionRoute {
@@ -148,12 +183,22 @@ pub enum WriteCommand {
     },
 
     // -- Schedules --
-    UpdateScheduleLastRun { schedule_id: String, now: String },
-    UpdateScheduleNextRun { schedule_id: String, next_run: String },
+    UpdateScheduleLastRun {
+        schedule_id: String,
+        now: String,
+    },
+    UpdateScheduleNextRun {
+        schedule_id: String,
+        next_run: String,
+    },
 
     // -- Agent Ops --
-    SpawnAgent { agent_name: String },
-    KillAgent { agent_id: String },
+    SpawnAgent {
+        agent_name: String,
+    },
+    KillAgent {
+        agent_id: String,
+    },
 }
 
 /// Response from applying a WriteCommand.

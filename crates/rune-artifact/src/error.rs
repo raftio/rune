@@ -34,4 +34,10 @@ pub enum ArtifactError {
 
     #[error("no packable files under agent directory")]
     EmptyPackage,
+
+    #[error("failed to read file {0}: {1}")]
+    ReadFile(PathBuf, #[source] std::io::Error),
+
+    #[error("failed to serialize manifest: {0}")]
+    SerializeManifest(#[source] serde_json::Error),
 }

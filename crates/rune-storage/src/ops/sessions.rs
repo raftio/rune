@@ -70,8 +70,8 @@ pub async fn append_message(
     step: i64,
 ) -> Result<(), StorageError> {
     let id = Uuid::new_v4().to_string();
-    let content_str = serde_json::to_string(content)
-        .map_err(|e| StorageError::Serialization(e.to_string()))?;
+    let content_str =
+        serde_json::to_string(content).map_err(|e| StorageError::Serialization(e.to_string()))?;
     sqlx::query(
         "INSERT INTO session_messages (id, session_id, role, content, step)
          VALUES (?, ?, ?, ?, ?)",
@@ -154,8 +154,8 @@ pub async fn checkpoint(
         step,
         created_at: chrono::Utc::now().to_rfc3339(),
     };
-    let data = serde_json::to_string(&blob)
-        .map_err(|e| StorageError::Serialization(e.to_string()))?;
+    let data =
+        serde_json::to_string(&blob).map_err(|e| StorageError::Serialization(e.to_string()))?;
     let data_bytes = data.as_bytes();
 
     let (data_to_store, storage_ref): (String, Option<String>) =
@@ -212,9 +212,8 @@ pub async fn restore(
                     )
                 })?;
                 let bytes = store.get_checkpoint(path_ref).await?;
-                String::from_utf8(bytes).map_err(|e| {
-                    StorageError::Serialization(format!("checkpoint decode: {e}"))
-                })?
+                String::from_utf8(bytes)
+                    .map_err(|e| StorageError::Serialization(format!("checkpoint decode: {e}")))?
             } else {
                 r.data.unwrap_or_default()
             };

@@ -3,8 +3,8 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use serde::{Deserialize, Serialize};
 use rune_storage::RuneStore;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -31,8 +31,12 @@ pub struct CreateDeploymentRequest {
     pub env: HashMap<String, String>,
 }
 
-fn default_one() -> i32 { 1 }
-fn default_concurrency() -> i32 { 10 }
+fn default_one() -> i32 {
+    1
+}
+fn default_concurrency() -> i32 {
+    10
+}
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct DeploymentRow {
@@ -76,11 +80,14 @@ pub async fn create_deployment(
     State(store): State<Arc<RuneStore>>,
     Json(req): Json<CreateDeploymentRequest>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), ControlPlaneError> {
-    store.check_deployment_admission(req.agent_version_id).await?;
+    store
+        .check_deployment_admission(req.agent_version_id)
+        .await?;
 
     if !store.agent_version_exists(req.agent_version_id).await? {
         return Err(ControlPlaneError::NotFound(format!(
-            "agent_version {} not found", req.agent_version_id
+            "agent_version {} not found",
+            req.agent_version_id
         )));
     }
 
@@ -120,7 +127,10 @@ pub async fn create_deployment(
     .await
     .map_err(ControlPlaneError::Database)?;
 
-    Ok((StatusCode::CREATED, Json(serde_json::to_value(&row).unwrap())))
+    Ok((
+        StatusCode::CREATED,
+        Json(serde_json::to_value(&row).unwrap()),
+    ))
 }
 
 pub async fn list_deployments(
@@ -154,10 +164,14 @@ pub async fn scale_deployment(
     let affected = store.scale_deployment(id, req.desired_replicas).await?;
 
     if affected == 0 {
-        return Err(ControlPlaneError::NotFound(format!("deployment {id} not found")));
+        return Err(ControlPlaneError::NotFound(format!(
+            "deployment {id} not found"
+        )));
     }
 
-    Ok(Json(serde_json::json!({ "id": id, "desired_replicas": req.desired_replicas })))
+    Ok(Json(
+        serde_json::json!({ "id": id, "desired_replicas": req.desired_replicas }),
+    ))
 }
 
 pub async fn delete_deployment(
@@ -172,7 +186,9 @@ pub async fn delete_deployment(
     };
 
     if affected == 0 {
-        return Err(ControlPlaneError::NotFound(format!("deployment {id} not found")));
+        return Err(ControlPlaneError::NotFound(format!(
+            "deployment {id} not found"
+        )));
     }
 
     Ok(StatusCode::NO_CONTENT)

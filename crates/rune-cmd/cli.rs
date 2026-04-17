@@ -31,8 +31,10 @@ pub enum Command {
         #[command(subcommand)]
         cmd: AgentCommand,
     },
-    /// Deploy an agent from a local spec or git source
+    /// Deploy an agent from a Runefile, local tree, stored artifact, or git source
     Run(RunArgs),
+    /// Interactive chat with a deployed agent (gateway HTTP)
+    Chat(ChatArgs),
     /// List active deployments and their replica health
     Status(StatusArgs),
     /// View conversation session history
@@ -47,17 +49,12 @@ pub enum Command {
     Stop(StopAgentArgs),
     /// Remove a deployment
     Rm(RmAgentArgs),
-    /// Deploy and manage multiple agents from a compose file
-    Compose {
-        #[command(subcommand)]
-        cmd: ComposeCommand,
-    },
     /// Manage Raft cluster membership
     Cluster {
         #[command(subcommand)]
         cmd: ClusterCommand,
     },
-    /// Pack or verify portable agent archives (Open Agent Initiative / gzip tar)
+    /// Pack or inspect portable agent archives (Open Agent Initiative / gzip tar)
     Artifact {
         #[command(subcommand)]
         cmd: ArtifactCommand,
@@ -152,14 +149,28 @@ pub struct AgentRmArgs {
 
 #[derive(clap::Args)]
 pub struct RunArgs {
-    /// Agent source: path to Runefile, agent directory containing a Runefile, or git://repo-url[#subdir]
-    pub agent_spec: String,
+    /// Path to a Runefile (YAML). Mutually exclusive with AGENT_SPEC.
+    #[arg(short = 'f', long = "file", conflicts_with = "agent_spec")]
+    pub file: Option<std::path::PathBuf>,
+
+    /// Local path (agent dir or Runefile), artifact agent name from `rune artifact ls`, or git://...
+    #[arg(required_unless_present = "file")]
+    pub agent_spec: Option<String>,
     #[arg(long, default_value = "dev")]
     pub namespace: String,
     #[arg(long, default_value = "stable")]
     pub alias: String,
     #[arg(long, default_value = "http://localhost:8081")]
     pub control_plane: String,
+}
+
+#[derive(clap::Args)]
+pub struct ChatArgs {
+    /// Deployed agent name (see `rune agent ls`)
+    pub agent: String,
+    /// Gateway base URL (default matches `rune daemon start`)
+    #[arg(long, default_value = "http://localhost:8080")]
+    pub gateway: String,
 }
 
 #[derive(clap::Args)]
@@ -270,62 +281,41 @@ pub struct DaemonStatusArgs {
 }
 
 #[derive(Subcommand)]
-pub enum ComposeCommand {
-    /// Deploy all agents defined in the compose file
-    Up(ComposeUpArgs),
-    /// Tear down all agents in the compose project
-    Down(ComposeDownArgs),
-    /// List status of agents in the compose project
-    Ps(ComposePsArgs),
-}
-
-#[derive(clap::Args)]
-pub struct ComposeUpArgs {
-    /// Path to the compose file
-    #[arg(short, long, default_value = "rune-compose.yaml")]
-    pub file: String,
-    #[arg(long, default_value = "http://localhost:8081")]
-    pub control_plane: String,
-}
-
-#[derive(clap::Args)]
-pub struct ComposeDownArgs {
-    /// Path to the compose file
-    #[arg(short, long, default_value = "rune-compose.yaml")]
-    pub file: String,
-    #[arg(long, default_value = "http://localhost:8081")]
-    pub control_plane: String,
-}
-
-#[derive(clap::Args)]
-pub struct ComposePsArgs {
-    /// Path to the compose file
-    #[arg(short, long, default_value = "rune-compose.yaml")]
-    pub file: String,
-    #[arg(long, default_value = "http://localhost:8081")]
-    pub control_plane: String,
-}
-
-#[derive(Subcommand)]
 pub enum ArtifactCommand {
-    /// Pack an agent directory into ~/.rune/artifacts/{name}-{tag}.tar.gz
+    /// Materialize an OAI bundle directory at ~/.rune/artifacts/{name}-{tag}/agent/
     Build(ArtifactBuildArgs),
-    /// Verify ~/.rune/artifacts/{name}-{tag}.tar.gz
-    Verify(ArtifactVerifyArgs),
+    /// Write ~/.rune/artifacts/{name}-{tag}.tar.gz from a materialized bundle directory
+    Export(ArtifactExportArgs),
+    /// Inspect a bundle directory or legacy ~/.rune/artifacts/{name}-{tag}.tar.gz (manifest + integrity)
+    Inspect(ArtifactInspectArgs),
+    /// List materialized bundle dirs and .tar.gz archives under ~/.rune/artifacts
+    Ls,
 }
 
 #[derive(clap::Args)]
 pub struct ArtifactBuildArgs {
     /// Agent directory (contains Runefile)
     pub agent_dir: std::path::PathBuf,
-    /// Local tag for manifest and filename ~/.rune/artifacts/{agent-name}-{tag}.tar.gz (default: latest)
+    /// Local tag for manifest and directory ~/.rune/artifacts/{agent-name}-{tag}/ (default: latest)
     #[arg(long)]
     pub tag: Option<String>,
 }
 
 #[derive(clap::Args)]
-pub struct ArtifactVerifyArgs {
-    /// Agent name (filename prefix; same as Runefile `name` from build)
+pub struct ArtifactExportArgs {
+    /// Agent name (same as Runefile `name` from build)
+    pub name: String,
+    /// Tag (default: latest)
+    #[arg(default_value = "latest")]
+    pub tag: String,
+    /// Output .tar.gz path (default: ~/.rune/artifacts/{name}-{tag}.tar.gz)
+    #[arg(long)]
+    pub output: Option<std::path::PathBuf>,
+}
+
+#[derive(clap::Args)]
+pub struct ArtifactInspectArgs {
+    /// Agent name (directory name prefix; same as Runefile `name` from build)
     pub name: String,
     /// Tag (default: latest)
     #[arg(default_value = "latest")]

@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use uuid::Uuid;
 
-use rune_spec::workflow::{topological_sort, WorkflowSpec};
+use rune_spec::{topological_sort, WorkflowSpec};
 
 use crate::error::RuntimeError;
 
@@ -37,13 +37,9 @@ impl WorkflowExecutor {
     }
 
     /// Run the workflow DAG to completion and return the final output.
-    pub async fn run(
-        &self,
-        input: serde_json::Value,
-    ) -> Result<serde_json::Value, RuntimeError> {
-        let order = topological_sort(&self.spec.steps).ok_or_else(|| {
-            RuntimeError::Engine("workflow has a dependency cycle".into())
-        })?;
+    pub async fn run(&self, input: serde_json::Value) -> Result<serde_json::Value, RuntimeError> {
+        let order = topological_sort(&self.spec.steps)
+            .ok_or_else(|| RuntimeError::Engine("workflow has a dependency cycle".into()))?;
 
         let mut step_outputs: HashMap<String, serde_json::Value> = HashMap::new();
         let steps = &self.spec.steps;
@@ -76,25 +72,20 @@ impl WorkflowExecutor {
                             step = %step.id,
                             "skipping step — condition not met"
                         );
-                        step_outputs.insert(
-                            step.id.clone(),
-                            serde_json::json!({ "skipped": true }),
-                        );
+                        step_outputs
+                            .insert(step.id.clone(), serde_json::json!({ "skipped": true }));
                         continue;
                     }
                 }
 
                 let step_input = render_template(&step.input_template, &input, &step_outputs);
                 let endpoint = resolve_agent_endpoint(&step.agent_ref, &self.gateway_base_url);
-                let step_timeout = step
-                    .timeout_ms
-                    .unwrap_or(self.spec.timeout_ms);
+                let step_timeout = step.timeout_ms.unwrap_or(self.spec.timeout_ms);
                 let step_id = step.id.clone();
                 let depth = self.call_depth;
 
                 handles.push(tokio::spawn(async move {
-                    let client =
-                        rune_a2a::A2aClient::new(Duration::from_millis(step_timeout));
+                    let client = rune_a2a::A2aClient::new(Duration::from_millis(step_timeout));
 
                     let message = rune_a2a::Message {
                         message_id: Uuid::new_v4().to_string(),
@@ -118,15 +109,12 @@ impl WorkflowExecutor {
                         })?;
 
                     let output = match result {
-                        rune_a2a::SendMessageResult::Task(task) => {
-                            task.text_output()
-                                .map(|t| serde_json::json!({ "text": t }))
-                                .or_else(|| task.data_output())
-                                .unwrap_or(serde_json::json!({ "completed": true }))
-                        }
-                        rune_a2a::SendMessageResult::Message(msg) => {
-                            extract_message_output(&msg)
-                        }
+                        rune_a2a::SendMessageResult::Task(task) => task
+                            .text_output()
+                            .map(|t| serde_json::json!({ "text": t }))
+                            .or_else(|| task.data_output())
+                            .unwrap_or(serde_json::json!({ "completed": true })),
+                        rune_a2a::SendMessageResult::Message(msg) => extract_message_output(&msg),
                     };
 
                     Ok::<(String, serde_json::Value), RuntimeError>((step_id, output))
@@ -137,18 +125,16 @@ impl WorkflowExecutor {
             for handle in handles {
                 let (step_id, output) = handle
                     .await
-                    .map_err(|e| RuntimeError::Engine(format!("step join error: {e}")))?
-                    ?;
+                    .map_err(|e| RuntimeError::Engine(format!("step join error: {e}")))??;
                 step_outputs.insert(step_id, output);
             }
         }
 
         // Compose final output.
         let final_output = if let Some(ref output_step) = self.spec.output_step {
-            step_outputs
-                .get(output_step)
-                .cloned()
-                .unwrap_or(serde_json::json!({ "error": format!("output step '{}' not found", output_step) }))
+            step_outputs.get(output_step).cloned().unwrap_or(
+                serde_json::json!({ "error": format!("output step '{}' not found", output_step) }),
+            )
         } else if let Some(last_idx) = order.last() {
             let last_id = &steps[*last_idx].id;
             step_outputs
@@ -165,7 +151,7 @@ impl WorkflowExecutor {
 
 /// Group topologically-sorted indices into "waves" where all deps are
 /// satisfied within or before the wave.
-fn build_waves(order: &[usize], steps: &[rune_spec::workflow::WorkflowStep]) -> Vec<Vec<usize>> {
+fn build_waves(order: &[usize], steps: &[rune_spec::WorkflowStep]) -> Vec<Vec<usize>> {
     use std::collections::HashSet;
 
     let id_to_idx: HashMap<&str, usize> = steps
@@ -184,15 +170,12 @@ fn build_waves(order: &[usize], steps: &[rune_spec::workflow::WorkflowStep]) -> 
 
         for &idx in &remaining {
             let step = &steps[idx];
-            let deps_met = step
-                .depends_on
-                .iter()
-                .all(|dep| {
-                    id_to_idx
-                        .get(dep.as_str())
-                        .map(|&d| completed.contains(&d))
-                        .unwrap_or(true)
-                });
+            let deps_met = step.depends_on.iter().all(|dep| {
+                id_to_idx
+                    .get(dep.as_str())
+                    .map(|&d| completed.contains(&d))
+                    .unwrap_or(true)
+            });
 
             if deps_met {
                 wave.push(idx);
@@ -235,19 +218,21 @@ fn render_template(
     for (step_id, output) in step_outputs {
         // Reject step_ids with characters that could interfere with the
         // template syntax or inject unexpected patterns.
-        if !step_id.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
+        if !step_id
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        {
             tracing::warn!(step_id = %step_id, "skipping step_id with unsafe characters in template");
             continue;
         }
         let pattern = format!("{{{{ steps.{step_id}.output }}}}");
         let output_str = match output {
             serde_json::Value::String(s) => s.clone(),
-            serde_json::Value::Object(obj) => {
-                obj.get("text")
-                    .and_then(|v| v.as_str())
-                    .map(String::from)
-                    .unwrap_or_else(|| output.to_string())
-            }
+            serde_json::Value::Object(obj) => obj
+                .get("text")
+                .and_then(|v| v.as_str())
+                .map(String::from)
+                .unwrap_or_else(|| output.to_string()),
             other => other.to_string(),
         };
         result = result.replace(&pattern, &output_str);
@@ -257,10 +242,7 @@ fn render_template(
 }
 
 /// Simple condition evaluator: `{{ steps.<id>.output }} == "value"`
-fn evaluate_condition(
-    condition: &str,
-    step_outputs: &HashMap<String, serde_json::Value>,
-) -> bool {
+fn evaluate_condition(condition: &str, step_outputs: &HashMap<String, serde_json::Value>) -> bool {
     if let Some((lhs, rhs)) = condition.split_once("==") {
         let lhs = lhs.trim();
         let rhs = rhs.trim().trim_matches('"');
@@ -279,22 +261,18 @@ fn resolve_template_value(
     expr: &str,
     step_outputs: &HashMap<String, serde_json::Value>,
 ) -> Option<String> {
-    let expr = expr
-        .trim_start_matches("{{")
-        .trim_end_matches("}}")
-        .trim();
+    let expr = expr.trim_start_matches("{{").trim_end_matches("}}").trim();
 
     // steps.<id>.output
     if let Some(rest) = expr.strip_prefix("steps.") {
         if let Some((step_id, _field)) = rest.split_once('.') {
             return step_outputs.get(step_id).map(|v| match v {
                 serde_json::Value::String(s) => s.clone(),
-                serde_json::Value::Object(obj) => {
-                    obj.get("text")
-                        .and_then(|t| t.as_str())
-                        .unwrap_or("")
-                        .to_string()
-                }
+                serde_json::Value::Object(obj) => obj
+                    .get("text")
+                    .and_then(|t| t.as_str())
+                    .unwrap_or("")
+                    .to_string(),
                 other => other.to_string(),
             });
         }

@@ -4,10 +4,7 @@ use uuid::Uuid;
 use crate::error::StorageError;
 use crate::models::{NewReplica, ReplicaState};
 
-pub async fn count_healthy(
-    db: &SqlitePool,
-    deployment_id: Uuid,
-) -> Result<i64, StorageError> {
+pub async fn count_healthy(db: &SqlitePool, deployment_id: Uuid) -> Result<i64, StorageError> {
     let count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM agent_replicas WHERE deployment_id = ? AND state IN ('starting', 'ready')",
     )
@@ -20,12 +17,11 @@ pub async fn count_healthy(
 pub async fn insert(db: &SqlitePool, r: &NewReplica) -> Result<Uuid, StorageError> {
     // Defensive: avoid FK violation when InsertReplica is applied after DeleteDeployment
     // (e.g. compose down committed before reconcile's InsertReplica).
-    let exists: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM agent_deployments WHERE id = ?)",
-    )
-    .bind(r.deployment_id.to_string())
-    .fetch_one(db)
-    .await?;
+    let exists: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM agent_deployments WHERE id = ?)")
+            .bind(r.deployment_id.to_string())
+            .fetch_one(db)
+            .await?;
     if !exists {
         return Err(StorageError::NotFound(format!(
             "deployment {} no longer exists (stale InsertReplica, e.g. compose down)",
@@ -64,11 +60,7 @@ pub async fn set_ready(db: &SqlitePool, id: Uuid) -> Result<(), StorageError> {
     Ok(())
 }
 
-pub async fn set_state(
-    db: &SqlitePool,
-    id: Uuid,
-    state: ReplicaState,
-) -> Result<(), StorageError> {
+pub async fn set_state(db: &SqlitePool, id: Uuid, state: ReplicaState) -> Result<(), StorageError> {
     sqlx::query("UPDATE agent_replicas SET state = ? WHERE id = ?")
         .bind(state.to_string())
         .bind(id.to_string())
@@ -105,10 +97,7 @@ pub async fn get_drainable_ids(
     Ok(ids.into_iter().filter_map(|s| s.parse().ok()).collect())
 }
 
-pub async fn mark_stale_failed(
-    db: &SqlitePool,
-    threshold_secs: i64,
-) -> Result<u64, StorageError> {
+pub async fn mark_stale_failed(db: &SqlitePool, threshold_secs: i64) -> Result<u64, StorageError> {
     let result = sqlx::query(
         "UPDATE agent_replicas
          SET state = 'failed'
@@ -171,13 +160,11 @@ pub async fn decrement_load(db: &SqlitePool, replica_id: Uuid) -> Result<(), Sto
 }
 
 pub async fn get_current_load(db: &SqlitePool, replica_id: Uuid) -> Result<i64, StorageError> {
-    let load: i64 = sqlx::query_scalar(
-        "SELECT current_load FROM agent_replicas WHERE id = ?",
-    )
-    .bind(replica_id.to_string())
-    .fetch_optional(db)
-    .await?
-    .unwrap_or(0);
+    let load: i64 = sqlx::query_scalar("SELECT current_load FROM agent_replicas WHERE id = ?")
+        .bind(replica_id.to_string())
+        .fetch_optional(db)
+        .await?
+        .unwrap_or(0);
     Ok(load)
 }
 
@@ -185,12 +172,11 @@ pub async fn get_backend_instance_id(
     db: &SqlitePool,
     replica_id: Uuid,
 ) -> Result<Option<String>, StorageError> {
-    let id: Option<String> = sqlx::query_scalar(
-        "SELECT backend_instance_id FROM agent_replicas WHERE id = ?",
-    )
-    .bind(replica_id.to_string())
-    .fetch_optional(db)
-    .await?;
+    let id: Option<String> =
+        sqlx::query_scalar("SELECT backend_instance_id FROM agent_replicas WHERE id = ?")
+            .bind(replica_id.to_string())
+            .fetch_optional(db)
+            .await?;
     Ok(id)
 }
 

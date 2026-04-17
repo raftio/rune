@@ -1,46 +1,84 @@
 pub mod agent;
+pub mod error;
 pub mod models;
 pub mod runefile;
 pub mod tool;
-pub mod error;
+pub mod workflow;
 
 pub use agent::AgentSpec;
-pub use models::ModelsSpec;
-pub use runefile::Runefile;
-pub use tool::{ToolDescriptor, ToolRuntime};
-pub use error::SpecError;
+pub use models::{FallbackPolicy, ModelsSpec};
+pub use tool::{RetryPolicy, ToolDescriptor, ToolRuntime};
+pub use workflow::{topological_sort, WorkflowSpec, WorkflowStep};
 
+/// Type alias for [`ModelsSpec`] — the `models:` block in a Runefile (providers, `model_mapping`, etc.).
+pub type ModelSpec = ModelsSpec;
+pub use error::SpecError;
+pub use runefile::Runefile;
 use std::path::Path;
 
-/// Full agent package loaded from an agent directory containing a `Runefile`.
+/// Full agent package loaded from a `Runefile`.
+///
+/// Model configuration lives in [`AgentSpec::models`] ([`ModelsSpec`]). The concrete model id for
+/// the configured [`AgentSpec::default_model`] alias is returned by [`AgentPackage::resolved_model`].
+#[derive(Debug)]
 pub struct AgentPackage {
     pub spec: AgentSpec,
-    pub models: ModelsSpec,
+}
+
+fn resolve_default_model(spec: &AgentSpec) -> Result<String, SpecError> {
+    spec.models
+        .model_mapping
+        .get(spec.default_model.as_str())
+        .cloned()
+        .ok_or_else(|| {
+            SpecError::Validation(format!(
+                "models.model_mapping has no entry for default_model alias {:?}",
+                spec.default_model
+            ))
+        })
 }
 
 impl AgentPackage {
     pub fn load(agent_dir: &Path) -> Result<Self, SpecError> {
-        let runefile_path = agent_dir.join("Runefile");
-        let rf = Runefile::load(&runefile_path)?;
-        let (spec, models) = (rf.spec, rf.models);
+        let rf = Runefile::load(&agent_dir.join("Runefile"))?;
+        resolve_default_model(&rf.spec)?;
+        Ok(Self { spec: rf.spec })
+    }
 
-        Ok(Self { spec, models })
+    /// Load from an explicit Runefile path (any filename); validates default model mapping.
+    pub fn load_runefile(path: &Path) -> Result<Self, SpecError> {
+        let rf = Runefile::load(path)?;
+        resolve_default_model(&rf.spec)?;
+        Ok(Self { spec: rf.spec })
+    }
+
+    /// Concrete model id for [`AgentSpec::default_model`] via [`ModelsSpec::model_mapping`].
+    pub fn resolved_model(&self) -> Result<String, SpecError> {
+        resolve_default_model(&self.spec)
     }
 }
+
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
 
     #[test]
-    fn load_tools_dir_with_valid_tool_loaded() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::write(
+    fn load_package_requires_model_mapping_for_default_alias() {
+        let dir = tempdir().unwrap();
+        fs::write(
             dir.path().join("Runefile"),
-            "name: a\nversion: 0.1.0\ninstructions: x\ndefault_model: d\nruntime: {}\nmodels: {}\ntoolset:\n  - my_search\n",
+            r"name: a
+version: 0.1.0
+instructions: x
+default_model: default
+models:
+  model_mapping: {}
+",
         )
         .unwrap();
-        let tools_dir = dir.path().join("tools");
-        std::fs::create_dir(&tools_dir).unwrap();
-        std::fs::write(tools_dir.join("search.yaml"), "name: my_search\n").unwrap();
-
+        let err = AgentPackage::load(dir.path()).unwrap_err();
+        assert!(matches!(err, SpecError::Validation(_)));
     }
 }

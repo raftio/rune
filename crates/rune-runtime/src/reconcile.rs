@@ -39,7 +39,10 @@ impl ReconcileLoop {
     }
 
     async fn reconcile_once(&self) -> anyhow::Result<()> {
-        let stale = self.store.mark_stale_replicas_failed(self.stale_threshold_secs).await?;
+        let stale = self
+            .store
+            .mark_stale_replicas_failed(self.stale_threshold_secs)
+            .await?;
         if stale > 0 {
             warn!("Marked {stale} stale replica(s) as failed");
         }

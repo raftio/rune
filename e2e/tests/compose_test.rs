@@ -27,11 +27,7 @@ async fn register_version(srv: &TestServer, agent_name: &str) -> String {
 }
 
 /// Create a deployment tagged with a project_ref.
-async fn create_deployment(
-    srv: &TestServer,
-    version_id: &str,
-    project: &str,
-) -> serde_json::Value {
+async fn create_deployment(srv: &TestServer, version_id: &str, project: &str) -> serde_json::Value {
     let cp = srv.cp_url();
     reqwest::Client::new()
         .post(format!("{cp}/v1/deployments"))
@@ -170,19 +166,19 @@ async fn test_delete_nonexistent_deployment() {
 }
 
 // ---------------------------------------------------------------------------
-// compose lifecycle: create multiple, list by project, delete all
+// deployments by project_ref: create multiple, list by project, delete all
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
-async fn test_compose_lifecycle() {
+async fn test_deployments_by_project_lifecycle() {
     let srv = TestServer::start().await;
-    let project = "compose-lifecycle";
+    let project = "project-lifecycle";
 
     let v1 = register_version(&srv, "svc-alpha").await;
     let v2 = register_version(&srv, "svc-beta").await;
     let v3 = register_version(&srv, "svc-gamma").await;
 
-    // "compose up" — deploy all three with the same project_ref
+    // Deploy all three with the same project_ref
     let d1 = create_deployment(&srv, &v1, project).await;
     let d2 = create_deployment(&srv, &v2, project).await;
     let d3 = create_deployment(&srv, &v3, project).await;
@@ -190,7 +186,7 @@ async fn test_compose_lifecycle() {
     let cp = srv.cp_url();
     let http = reqwest::Client::new();
 
-    // "compose ps" — list by project
+    // List by project
     let body: serde_json::Value = http
         .get(format!("{cp}/v1/deployments?project={project}"))
         .send()
@@ -202,7 +198,7 @@ async fn test_compose_lifecycle() {
     let deps = body["deployments"].as_array().unwrap();
     assert_eq!(deps.len(), 3);
 
-    // "compose down" — delete all project deployments
+    // Delete all project deployments
     for deploy in [&d1, &d2, &d3] {
         let id = deploy["id"].as_str().unwrap();
         let resp = http
@@ -223,7 +219,10 @@ async fn test_compose_lifecycle() {
         .await
         .unwrap();
     let deps = body["deployments"].as_array().unwrap();
-    assert!(deps.is_empty(), "all deployments should be removed after compose down");
+    assert!(
+        deps.is_empty(),
+        "all deployments should be removed after project teardown"
+    );
 }
 
 // ---------------------------------------------------------------------------

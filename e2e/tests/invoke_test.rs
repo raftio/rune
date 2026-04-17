@@ -23,8 +23,14 @@ async fn test_invoke_creates_session() {
         .await;
 
     assert_eq!(status, 200, "body: {body}");
-    assert!(body["session_id"].as_str().is_some(), "should have session_id");
-    assert!(body["request_id"].as_str().is_some(), "should have request_id");
+    assert!(
+        body["session_id"].as_str().is_some(),
+        "should have session_id"
+    );
+    assert!(
+        body["request_id"].as_str().is_some(),
+        "should have request_id"
+    );
     assert!(body["output"].is_object(), "should have output");
 }
 
@@ -41,7 +47,10 @@ async fn test_invoke_with_session_reuses() {
         )
         .await;
     assert_eq!(create_status, 201, "create session: {create_body}");
-    let session_id = create_body["session_id"].as_str().expect("session_id").to_string();
+    let session_id = create_body["session_id"]
+        .as_str()
+        .expect("session_id")
+        .to_string();
 
     // Invoke with that session.
     let (invoke_status, invoke_body) = srv
@@ -179,9 +188,7 @@ async fn test_get_session_not_found() {
     let srv = TestServer::start().await;
     let fake_id = Uuid::new_v4();
 
-    let (status, _body) = srv
-        .get_json(&format!("/v1/sessions/{fake_id}"))
-        .await;
+    let (status, _body) = srv.get_json(&format!("/v1/sessions/{fake_id}")).await;
 
     assert_eq!(status, 404);
 }

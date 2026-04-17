@@ -1,17 +1,17 @@
-//! Portable **rune-artifact** packs: gzip-compressed tarballs with a versioned `manifest.json`
-//! and the same on-disk layout [`rune_spec::AgentPackage::load`] expects under an `agent/`
-//! directory after extraction (`Runefile`, `tools/`, `skills/`, optional `workflow.yaml`).
+//! Portable **rune-artifact** bundles: a versioned `manifest.json` plus packable agent files under
+//! an `agent/` tree (same layout [`rune_spec::AgentPackage::load`] expects).
 //!
 //! **Open Agent Initiative (OAI)** is the project’s name for this portable agent bundle format.
 //! It is **not** an [Open Container Initiative](https://opencontainers.org/) (OCI) **container**
-//! image; the payload is a deterministic archive for agents, not a container runtime image.
+//! image; the payload is a deterministic bundle for agents, not a container runtime image.
 //!
 //! **Remote skills:** refs listed in `Runefile` but not present under `skills/` are **not**
-//! embedded in the tarball (MVP packs on-disk files only). After extract, `missing_skills` is
-//! populated the same as loading from a dev tree.
+//! embedded (MVP packs on-disk files only). After load, `missing_skills` is populated the same as
+//! loading from a dev tree.
 //!
-//! Typical flow: [`pack_agent_dir`](crate::pack_agent_dir) → ship `.tar.gz` →
-//! [`verify`](crate::verify) → [`extract_to_temp`](crate::extract_to_temp) or
+//! Typical flow: [`materialize_agent_bundle`](crate::materialize_agent_bundle) → ship directory or
+//! [`export_bundle_to_tar_gz_file`](crate::export_bundle_to_tar_gz_file) for a `.tar.gz` →
+//! [`verify_dir`](crate::verify_dir) / [`verify`](crate::verify) → [`extract_to_temp`](crate::extract_to_temp) or
 //! [`extract_and_load_package`](crate::extract_and_load_package) → run.
 
 mod error;
@@ -21,8 +21,13 @@ mod verify;
 
 pub use error::ArtifactError;
 pub use manifest::{FileEntry, Manifest, FORMAT_V1, INITIATIVE_OPEN_AGENT};
-pub use pack::{pack_agent_dir, pack_agent_dir_to_file, PackOptions, PackSummary};
-pub use verify::{extract_and_load_package, extract_to_temp, verify};
+pub use pack::{
+    export_bundle_to_tar_gz, export_bundle_to_tar_gz_file, materialize_agent_bundle, pack_agent_dir,
+    pack_agent_dir_to_file, PackOptions, PackSummary,
+};
+pub use verify::{
+    extract_and_load_package, extract_to_temp, read_manifest, read_manifest_dir, verify, verify_dir,
+};
 
 #[cfg(test)]
 mod tests;

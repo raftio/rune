@@ -19,7 +19,9 @@ use rune_a2a::jsonrpc::*;
 use rune_a2a::types::*;
 
 use crate::error::GatewayError;
-use rune_runtime::{LlmClient, Planner, ReplicaRouter, SessionManager, SseEvent, StubPlanner, ToolDispatcher};
+use rune_runtime::{
+    LlmClient, Planner, ReplicaRouter, SessionManager, SseEvent, StubPlanner, ToolDispatcher,
+};
 
 // ---------------------------------------------------------------------------
 // Agent Card endpoints
@@ -30,7 +32,8 @@ pub async fn agent_card_global(
 ) -> Result<Json<AgentCard>, GatewayError> {
     let base_url = gateway_base_url(&state);
 
-    let agent_names = state.store
+    let agent_names = state
+        .store
         .list_deployed_agent_names()
         .await
         .map_err(rune_runtime::RuntimeError::Storage)?;
@@ -80,7 +83,12 @@ pub async fn agent_card(
 ) -> Result<Json<AgentCard>, GatewayError> {
     let base_url = gateway_base_url(&state);
 
-    if !state.store.verify_agent_deployed(&agent_name).await.map_err(rune_runtime::RuntimeError::Storage)? {
+    if !state
+        .store
+        .verify_agent_deployed(&agent_name)
+        .await
+        .map_err(rune_runtime::RuntimeError::Storage)?
+    {
         return Err(GatewayError::NotFound(format!(
             "no active deployment for agent '{agent_name}'"
         )));
@@ -140,18 +148,10 @@ pub async fn jsonrpc_handler(
     let rpc_id = rpc_req.id.clone();
 
     match rpc_req.method.as_str() {
-        METHOD_MESSAGE_SEND => {
-            handle_message_send(state.clone(), &agent_name, rpc_req).await
-        }
-        METHOD_MESSAGE_STREAM => {
-            handle_message_stream(state.clone(), &agent_name, rpc_req).await
-        }
-        METHOD_TASKS_GET => {
-            handle_tasks_get(state.store.clone(), rpc_req).await
-        }
-        METHOD_TASKS_CANCEL => {
-            handle_tasks_cancel(state.store.clone(), rpc_req).await
-        }
+        METHOD_MESSAGE_SEND => handle_message_send(state.clone(), &agent_name, rpc_req).await,
+        METHOD_MESSAGE_STREAM => handle_message_stream(state.clone(), &agent_name, rpc_req).await,
+        METHOD_TASKS_GET => handle_tasks_get(state.store.clone(), rpc_req).await,
+        METHOD_TASKS_CANCEL => handle_tasks_cancel(state.store.clone(), rpc_req).await,
         _ => {
             let resp = JsonRpcResponse::error(
                 rpc_id,
@@ -211,15 +211,18 @@ async fn handle_message_send(
     .await?;
 
     let router = ReplicaRouter::new(store.clone());
-    let lease = router.acquire(deployment_id, session_id).await
+    let lease = router
+        .acquire(deployment_id, session_id)
+        .await
         .map_err(|_| GatewayError::NoReplicaAvailable(deployment_id.to_string()))?;
     let replica_id = lease.replica_id;
 
     let plan = crate::routes::resolve_plan(agent_name, env.agent_packages_dir.as_deref());
     let tool_ctx = crate::routes::shared_tool_context(&store, env, Some(agent_name));
-    let tools = ToolDispatcher::with_depth(plan.tools.clone(), plan.agent_dir.clone(), incoming_depth)
-        .with_tool_context(tool_ctx)
-        .with_caller_networks(plan.networks.clone());
+    let tools =
+        ToolDispatcher::with_depth(plan.tools.clone(), plan.agent_dir.clone(), incoming_depth)
+            .with_tool_context(tool_ctx)
+            .with_caller_networks(plan.networks.clone());
 
     let user_input = parts_to_input(&params.message.parts);
 
@@ -227,12 +230,24 @@ async fn handle_message_send(
     let task_id = Uuid::new_v4();
 
     store
-        .insert_request(request_id, session_id, deployment_id, Some(replica_id), &user_input)
+        .insert_request(
+            request_id,
+            session_id,
+            deployment_id,
+            Some(replica_id),
+            &user_input,
+        )
         .await
         .map_err(rune_runtime::RuntimeError::RuntimeStore)?;
 
     store
-        .insert_a2a_task(&task_id.to_string(), &context_id, &request_id.to_string(), &session_id.to_string(), agent_name)
+        .insert_a2a_task(
+            &task_id.to_string(),
+            &context_id,
+            &request_id.to_string(),
+            &session_id.to_string(),
+            agent_name,
+        )
         .await
         .map_err(rune_runtime::RuntimeError::RuntimeStore)?;
 
@@ -241,7 +256,9 @@ async fn handle_message_send(
     let output = if let Some(client) = LlmClient::from_env() {
         let planner = Planner::new(plan);
         planner
-            .run(&client, &sessions, session_id, user_input, &tools, request_id, &store)
+            .run(
+                &client, &sessions, session_id, user_input, &tools, request_id, &store,
+            )
             .await?
     } else {
         let stub = StubPlanner::new(agent_name);
@@ -250,8 +267,14 @@ async fn handle_message_send(
 
     lease.release().await;
 
-    store.update_request_completed(request_id, &output).await.map_err(rune_runtime::RuntimeError::RuntimeStore)?;
-    store.update_a2a_task_state(&task_id.to_string(), "completed").await.map_err(rune_runtime::RuntimeError::RuntimeStore)?;
+    store
+        .update_request_completed(request_id, &output)
+        .await
+        .map_err(rune_runtime::RuntimeError::RuntimeStore)?;
+    store
+        .update_a2a_task_state(&task_id.to_string(), "completed")
+        .await
+        .map_err(rune_runtime::RuntimeError::RuntimeStore)?;
 
     let output_text = output
         .get("text")
@@ -279,8 +302,7 @@ async fn handle_message_send(
         kind: "task".into(),
     };
 
-    let result = serde_json::to_value(&task)
-        .map_err(|e| GatewayError::Internal(e.to_string()))?;
+    let result = serde_json::to_value(&task).map_err(|e| GatewayError::Internal(e.to_string()))?;
     let resp = JsonRpcResponse::success(rpc_id, result);
     Ok(Json(resp).into_response())
 }
@@ -327,22 +349,43 @@ async fn handle_message_stream(
     .await?;
 
     let router = ReplicaRouter::new(store.clone());
-    let lease = router.acquire(deployment_id, session_id).await
+    let lease = router
+        .acquire(deployment_id, session_id)
+        .await
         .map_err(|_| GatewayError::NoReplicaAvailable(deployment_id.to_string()))?;
     let replica_id = lease.replica_id;
 
     let plan = crate::routes::resolve_plan(agent_name, env.agent_packages_dir.as_deref());
     let tool_ctx = crate::routes::shared_tool_context(&store, env, Some(agent_name));
-    let tools = ToolDispatcher::with_depth(plan.tools.clone(), plan.agent_dir.clone(), incoming_depth)
-        .with_tool_context(tool_ctx)
-        .with_caller_networks(plan.networks.clone());
+    let tools =
+        ToolDispatcher::with_depth(plan.tools.clone(), plan.agent_dir.clone(), incoming_depth)
+            .with_tool_context(tool_ctx)
+            .with_caller_networks(plan.networks.clone());
     let user_input = parts_to_input(&params.message.parts);
 
     let request_id = Uuid::new_v4();
     let task_id = Uuid::new_v4();
 
-    store.insert_request(request_id, session_id, deployment_id, Some(replica_id), &user_input).await.map_err(rune_runtime::RuntimeError::RuntimeStore)?;
-    store.insert_a2a_task(&task_id.to_string(), &context_id, &request_id.to_string(), &session_id.to_string(), agent_name).await.map_err(rune_runtime::RuntimeError::RuntimeStore)?;
+    store
+        .insert_request(
+            request_id,
+            session_id,
+            deployment_id,
+            Some(replica_id),
+            &user_input,
+        )
+        .await
+        .map_err(rune_runtime::RuntimeError::RuntimeStore)?;
+    store
+        .insert_a2a_task(
+            &task_id.to_string(),
+            &context_id,
+            &request_id.to_string(),
+            &session_id.to_string(),
+            agent_name,
+        )
+        .await
+        .map_err(rune_runtime::RuntimeError::RuntimeStore)?;
 
     let Some(client) = LlmClient::from_env() else {
         return Err(GatewayError::Internal(
@@ -375,26 +418,24 @@ async fn handle_message_stream(
     let initial_result = serde_json::to_value(&initial_task)
         .map_err(|e| GatewayError::Internal(format!("failed to serialize initial task: {e}")))?;
     let initial_val = JsonRpcResponse::success(rpc_id_clone.clone(), initial_result);
-    let initial_payload = serde_json::to_value(&initial_val)
-        .map_err(|e| GatewayError::Internal(format!("failed to serialize initial response: {e}")))?;
+    let initial_payload = serde_json::to_value(&initial_val).map_err(|e| {
+        GatewayError::Internal(format!("failed to serialize initial response: {e}"))
+    })?;
     let _ = a2a_tx.send(initial_payload).await;
 
     tokio::spawn(async move {
         let planner = Planner::new(plan);
         let result = planner
             .run_stream(
-                &client,
-                &sessions,
-                session_id,
-                user_input,
-                &tools,
-                request_id,
-                &store2,
-                sse_tx,
+                &client, &sessions, session_id, user_input, &tools, request_id, &store2, sse_tx,
             )
             .await;
 
-        let status = if result.is_ok() { "completed" } else { "failed" };
+        let status = if result.is_ok() {
+            "completed"
+        } else {
+            "failed"
+        };
         if let Err(e) = store2.update_request_status(request_id, status).await {
             tracing::error!(
                 request_id = %request_id,
@@ -448,10 +489,13 @@ async fn handle_message_stream(
                         metadata: None,
                         kind: "artifact-update".into(),
                     };
-                    (JsonRpcResponse::success(
-                        rpc_for_bridge.clone(),
-                        serde_json::to_value(&update).unwrap_or_default(),
-                    ), false)
+                    (
+                        JsonRpcResponse::success(
+                            rpc_for_bridge.clone(),
+                            serde_json::to_value(&update).unwrap_or_default(),
+                        ),
+                        false,
+                    )
                 }
                 SseEvent::ToolStart { name } => {
                     let update = TaskStatusUpdateEvent {
@@ -471,10 +515,13 @@ async fn handle_message_stream(
                         is_final: None,
                         kind: "status-update".into(),
                     };
-                    (JsonRpcResponse::success(
-                        rpc_for_bridge.clone(),
-                        serde_json::to_value(&update).unwrap_or_default(),
-                    ), false)
+                    (
+                        JsonRpcResponse::success(
+                            rpc_for_bridge.clone(),
+                            serde_json::to_value(&update).unwrap_or_default(),
+                        ),
+                        false,
+                    )
                 }
                 SseEvent::ToolDone { name, result } => {
                     let update = TaskArtifactUpdateEvent {
@@ -492,10 +539,13 @@ async fn handle_message_stream(
                         metadata: None,
                         kind: "artifact-update".into(),
                     };
-                    (JsonRpcResponse::success(
-                        rpc_for_bridge.clone(),
-                        serde_json::to_value(&update).unwrap_or_default(),
-                    ), false)
+                    (
+                        JsonRpcResponse::success(
+                            rpc_for_bridge.clone(),
+                            serde_json::to_value(&update).unwrap_or_default(),
+                        ),
+                        false,
+                    )
                 }
                 SseEvent::Done { .. } => {
                     let update = TaskStatusUpdateEvent {
@@ -510,10 +560,13 @@ async fn handle_message_stream(
                         is_final: Some(true),
                         kind: "status-update".into(),
                     };
-                    (JsonRpcResponse::success(
-                        rpc_for_bridge.clone(),
-                        serde_json::to_value(&update).unwrap_or_default(),
-                    ), true)
+                    (
+                        JsonRpcResponse::success(
+                            rpc_for_bridge.clone(),
+                            serde_json::to_value(&update).unwrap_or_default(),
+                        ),
+                        true,
+                    )
                 }
                 SseEvent::Error { message } => {
                     let update = TaskStatusUpdateEvent {
@@ -533,10 +586,13 @@ async fn handle_message_stream(
                         is_final: Some(true),
                         kind: "status-update".into(),
                     };
-                    (JsonRpcResponse::success(
-                        rpc_for_bridge.clone(),
-                        serde_json::to_value(&update).unwrap_or_default(),
-                    ), true)
+                    (
+                        JsonRpcResponse::success(
+                            rpc_for_bridge.clone(),
+                            serde_json::to_value(&update).unwrap_or_default(),
+                        ),
+                        true,
+                    )
                 }
             };
 
@@ -639,8 +695,7 @@ async fn handle_tasks_get(
         kind: "task".into(),
     };
 
-    let result = serde_json::to_value(&task)
-        .map_err(|e| GatewayError::Internal(e.to_string()))?;
+    let result = serde_json::to_value(&task).map_err(|e| GatewayError::Internal(e.to_string()))?;
     Ok(Json(JsonRpcResponse::success(rpc_id, result)).into_response())
 }
 
@@ -688,8 +743,7 @@ async fn handle_tasks_cancel(
         kind: "task".into(),
     };
 
-    let result = serde_json::to_value(&task)
-        .map_err(|e| GatewayError::Internal(e.to_string()))?;
+    let result = serde_json::to_value(&task).map_err(|e| GatewayError::Internal(e.to_string()))?;
     Ok(Json(JsonRpcResponse::success(rpc_id, result)).into_response())
 }
 
@@ -710,7 +764,9 @@ async fn resolve_deployment(store: &RuneStore, agent_name: &str) -> Result<Uuid,
         .resolve_deployment_for_agent(agent_name)
         .await
         .map_err(rune_runtime::RuntimeError::Storage)?
-        .ok_or_else(|| GatewayError::NotFound(format!("no active deployment for agent '{agent_name}'")))
+        .ok_or_else(|| {
+            GatewayError::NotFound(format!("no active deployment for agent '{agent_name}'"))
+        })
 }
 
 async fn resolve_or_create_session(

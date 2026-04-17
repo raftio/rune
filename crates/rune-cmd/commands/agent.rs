@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use std::path::Path;
 
-use crate::cli::{AgentInspectArgs, AgentSessionsArgs, AgentLsArgs, AgentRmArgs, AgentStopArgs};
+use crate::cli::{AgentInspectArgs, AgentLsArgs, AgentRmArgs, AgentSessionsArgs, AgentStopArgs};
 
 /// Resolve an agent source to an `AgentPackage`.
 ///
@@ -50,6 +50,28 @@ pub fn resolve_agent_source(
     }
 }
 
+/// `rune run -f /path/to/Runefile.yaml`
+pub fn resolve_agent_from_runefile_path(
+    path: &Path,
+) -> Result<(Option<tempfile::TempDir>, rune_spec::AgentPackage)> {
+    use rune_spec::AgentPackage;
+    let pkg = AgentPackage::load_runefile(path)?;
+    Ok((None, pkg))
+}
+
+/// Local path, `git://...`, or stored artifact name (see `rune artifact ls`).
+pub fn resolve_agent_source_or_artifact(
+    agent_spec: &str,
+) -> Result<(Option<tempfile::TempDir>, rune_spec::AgentPackage)> {
+    if agent_spec.starts_with("git://") {
+        return resolve_agent_source(agent_spec);
+    }
+    if Path::new(agent_spec).exists() {
+        return resolve_agent_source(agent_spec);
+    }
+    crate::commands::artifact::load_by_stored_agent_name(agent_spec)
+}
+
 // ---------------------------------------------------------------------------
 // Runtime management helpers
 // ---------------------------------------------------------------------------
@@ -77,10 +99,7 @@ async fn fetch_control_plane_state(
         .await
         .unwrap_or_default();
 
-    let versions = versions_value
-        .as_array()
-        .cloned()
-        .unwrap_or_default();
+    let versions = versions_value.as_array().cloned().unwrap_or_default();
 
     Ok((deployments, versions))
 }
@@ -130,7 +149,10 @@ pub async fn ls(args: AgentLsArgs) -> Result<()> {
         return Ok(());
     }
 
-    println!("{:<20} {:<12} {:<8} {:<10} {}", "AGENT", "ALIAS", "NS", "STATUS", "REPLICAS");
+    println!(
+        "{:<20} {:<12} {:<8} {:<10} {}",
+        "AGENT", "ALIAS", "NS", "STATUS", "REPLICAS"
+    );
     println!("{}", "-".repeat(60));
 
     for (name, d) in &rows {
@@ -138,7 +160,10 @@ pub async fn ls(args: AgentLsArgs) -> Result<()> {
         let ns = d["namespace"].as_str().unwrap_or("?");
         let status = d["status"].as_str().unwrap_or("?");
         let desired = d["desired_replicas"].as_i64().unwrap_or(0);
-        println!("{:<20} {:<12} {:<8} {:<10} {}", name, alias, ns, status, desired);
+        println!(
+            "{:<20} {:<12} {:<8} {:<10} {}",
+            name, alias, ns, status, desired
+        );
     }
 
     Ok(())
@@ -154,7 +179,10 @@ pub async fn inspect(args: AgentInspectArgs) -> Result<()> {
         .iter()
         .filter(|(name, d)| {
             name == &args.name
-                && args.ns.as_deref().map_or(true, |ns| d["namespace"].as_str() == Some(ns))
+                && args
+                    .ns
+                    .as_deref()
+                    .map_or(true, |ns| d["namespace"].as_str() == Some(ns))
                 && args
                     .alias
                     .as_deref()
@@ -212,10 +240,7 @@ pub async fn inspect(args: AgentInspectArgs) -> Result<()> {
             println!("  Image:        {image_ref} ({digest_short})");
             println!("  Runtime:      {runtime_class}");
             println!("  Ver. status:  {vstatus}");
-            println!(
-                "  Registered:   {}",
-                &vcreated[..19.min(vcreated.len())]
-            );
+            println!("  Registered:   {}", &vcreated[..19.min(vcreated.len())]);
         } else {
             println!();
             println!("Registry / agent-version:");
@@ -293,7 +318,10 @@ pub async fn sessions_by_name(args: AgentSessionsArgs) -> Result<()> {
         .iter()
         .find(|(name, d)| {
             name == &args.name
-                && args.ns.as_deref().map_or(true, |ns| d["namespace"].as_str() == Some(ns))
+                && args
+                    .ns
+                    .as_deref()
+                    .map_or(true, |ns| d["namespace"].as_str() == Some(ns))
                 && args
                     .alias
                     .as_deref()
@@ -317,8 +345,8 @@ pub async fn sessions_by_name(args: AgentSessionsArgs) -> Result<()> {
     .fetch_optional(&db)
     .await?;
 
-    let session_id = session_id
-        .ok_or_else(|| anyhow::anyhow!("agent '{}' has no sessions yet", args.name))?;
+    let session_id =
+        session_id.ok_or_else(|| anyhow::anyhow!("agent '{}' has no sessions yet", args.name))?;
 
     #[derive(sqlx::FromRow)]
     struct Row {
@@ -392,7 +420,10 @@ pub async fn stop_by_name(args: AgentStopArgs) -> Result<()> {
         .iter()
         .filter(|(name, d)| {
             name == &args.name
-                && args.ns.as_deref().map_or(true, |ns| d["namespace"].as_str() == Some(ns))
+                && args
+                    .ns
+                    .as_deref()
+                    .map_or(true, |ns| d["namespace"].as_str() == Some(ns))
                 && args
                     .alias
                     .as_deref()
@@ -428,7 +459,10 @@ pub async fn rm_by_name(args: AgentRmArgs) -> Result<()> {
         .iter()
         .filter(|(name, d)| {
             name == &args.name
-                && args.ns.as_deref().map_or(true, |ns| d["namespace"].as_str() == Some(ns))
+                && args
+                    .ns
+                    .as_deref()
+                    .map_or(true, |ns| d["namespace"].as_str() == Some(ns))
                 && args
                     .alias
                     .as_deref()
@@ -493,4 +527,3 @@ mod inspect_tests {
         assert_eq!(rows[0].0, "chat");
     }
 }
-

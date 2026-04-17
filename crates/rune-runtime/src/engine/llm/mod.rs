@@ -113,7 +113,7 @@ pub fn user_input_to_content(input: &serde_json::Value) -> serde_json::Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rune_spec::{ToolDescriptor, ToolRuntime};
+    use rune_spec::{RetryPolicy, ToolDescriptor, ToolRuntime};
 
     // --- user_input_to_content ---
 
@@ -214,7 +214,7 @@ mod tests {
             runtime: ToolRuntime::Process,
             module: "tools/search.py".into(),
             timeout_ms: 5_000,
-            retry_policy: rune_spec::tool::RetryPolicy::default(),
+            retry_policy: RetryPolicy::default(),
             capabilities: vec![],
             input_schema_ref: None,
             output_schema_ref: None,
@@ -247,7 +247,7 @@ mod tests {
             runtime: ToolRuntime::Process,
             module: String::new(),
             timeout_ms: 5_000,
-            retry_policy: rune_spec::tool::RetryPolicy::default(),
+            retry_policy: RetryPolicy::default(),
             capabilities: vec![],
             input_schema_ref: None,
             output_schema_ref: None,

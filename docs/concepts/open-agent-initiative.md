@@ -14,7 +14,7 @@ Agents need a **clear boundary** between “source tree in development” and �
 - **Verified** after copy or build (per-file SHA-256 in a manifest).
 - **Addressed** by **name** and **tag** (like a simple coordinate) without a container registry—aligned with how the CLI stores and checks artifacts under `~/.rune/artifacts/`.
 
-OAI provides that boundary in Rune today as **`rune-artifact-v1`**: gzip-compressed tar with an `agent/manifest.json` and an `agent/` tree compatible with `AgentPackage::load`.
+OAI provides that boundary in Rune today as **`rune-artifact-v1`**: an `agent/manifest.json` plus an `agent/` tree compatible with `AgentPackage::load`, stored canonically as a directory; a gzip-compressed tar (`.tar.gz`) is the portable export of the same tree.
 
 ## Terminology
 
@@ -23,17 +23,18 @@ OAI provides that boundary in Rune today as **`rune-artifact-v1`**: gzip-compres
 | **OAI** | Open Agent Initiative — Rune’s label for this portable bundle format (documentation and `manifest.json` field `initiative: "open-agent"` when produced by current tooling). |
 | **OCI** | Open Container Initiative — industry standards for **container** images and runtimes. OAI artifacts are **not** OCI images. |
 | **`rune-artifact-v1`** | On-disk format version string in `manifest.json` (`format`). |
-| **Artifact digest** | SHA-256 of the **entire** `.tar.gz` bytes (printed by `rune artifact build`; not self-referentially embedded in `manifest.json` in v1). |
-| **Artifact store path** | Default location **`~/.rune/artifacts/{name}-{tag}.tar.gz`**, where `name` comes from the packed agent’s Runefile and `tag` is a CLI label (default **`latest`**). |
+| **Artifact digest** | SHA-256 of the **entire** `.tar.gz` bytes (printed by `rune artifact export` or library pack; not self-referentially embedded in `manifest.json` in v1). |
+| **Artifact store path** | Default **bundle directory** **`~/.rune/artifacts/{name}-{tag}/`** (materialized `agent/` tree). Export writes **`~/.rune/artifacts/{name}-{tag}.tar.gz`**. `name` comes from the Runefile; `tag` is a CLI label (default **`latest`**). |
 
 ## CLI conventions (current)
 
-The **`rune`** binary takes a **source path** for pack and **name/tag** coordinates for verify:
+The **`rune`** binary takes a **source path** for pack and **name/tag** coordinates for inspect:
 
 | Command | Role |
 |--------|------|
-| **`rune artifact build`** `AGENT_DIR` `[--tag TAG]` | Packs the agent at **`AGENT_DIR`** (must contain `Runefile`). Writes **`~/.rune/artifacts/{agent-name}-{tag}.tar.gz`**. No custom output path flag. **`--tag`** defaults to **`latest`** (filename + manifest `tag`). |
-| **`rune artifact verify`** `NAME` `[TAG]` | Verifies the file **`~/.rune/artifacts/{NAME}-{TAG}.tar.gz`** (same naming rule as build, including sanitization). **`TAG`** defaults to **`latest`** if omitted. No raw filesystem path on the CLI. |
+| **`rune artifact build`** `AGENT_DIR` `[--tag TAG]` | Materializes the agent at **`AGENT_DIR`** (must contain `Runefile`) into **`~/.rune/artifacts/{agent-name}-{tag}/agent/`**. **`--tag`** defaults to **`latest`** (directory name + manifest `tag`). |
+| **`rune artifact export`** `NAME` `[TAG]` `[--output PATH]` | Writes **`~/.rune/artifacts/{NAME}-{TAG}.tar.gz`** from the materialized bundle directory (optional **`--output`**). **`TAG`** defaults to **`latest`**. |
+| **`rune artifact inspect`** `NAME` `[TAG]` | Verifies the **bundle directory** if present; otherwise the legacy archive **`~/.rune/artifacts/{NAME}-{TAG}.tar.gz`**. Manifest fields and per-file integrity. **`TAG`** defaults to **`latest`**. |
 
 The library crate **`rune-artifact`** exposes pack/verify/extract APIs for arbitrary paths for embedders and tests.
 
@@ -60,7 +61,7 @@ Recommended practice without a registry:
 
 - **`Runefile`** `name` and `version` as the canonical semantic identity of the agent **spec**.
 - **Source tree** passed explicitly as **`rune artifact build AGENT_DIR`** (path to the directory containing `Runefile`).
-- **Artifact identity** via **`{name}`** (from Runefile at pack time) and **`tag`** (`--tag` on build, default **`latest`** in filename and manifest); **`rune artifact verify NAME [TAG]`** uses the same pair to locate the bundle under **`~/.rune/artifacts/`**.
+- **Artifact identity** via **`{name}`** (from Runefile at build time) and **`tag`** (`--tag` on build, default **`latest`** in directory name and manifest); **`rune artifact inspect`** / **`export`** use the same pair under **`~/.rune/artifacts/`**.
 - **Git** for history; **`--tag`** can mirror git tags when useful.
 
 ## Security and trust
@@ -74,7 +75,7 @@ The control plane may store **`image_ref`** / **`image_digest`** for **runtime**
 
 ## Roadmap (non-normative)
 
-- **Current:** Local pack and verify via `rune artifact build` / `verify`; library `extract` / `AgentPackage::load` for runtime; **no** remote registry in this iteration.
+- **Current:** Local materialize, export, and inspect via `rune artifact build` / `export` / `inspect`; library `extract` / `AgentPackage::load` for runtime; **no** remote registry in this iteration.
 - **Deferred:** Remote registry or object store, optional OCI Distribution **as transport only** for the same bytes (still not claiming an OAI bundle is a “container image”), control-plane fields for artifact digest.
 
 ## References

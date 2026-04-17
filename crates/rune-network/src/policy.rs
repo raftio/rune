@@ -10,8 +10,16 @@ impl NetworkPolicy {
     /// Empty slices are treated as `["bridge"]` (the implicit default network).
     pub fn check_access(caller_networks: &[String], callee_networks: &[String]) -> bool {
         let bridge = vec!["bridge".to_string()];
-        let caller = if caller_networks.is_empty() { &bridge } else { caller_networks };
-        let callee = if callee_networks.is_empty() { &bridge } else { callee_networks };
+        let caller = if caller_networks.is_empty() {
+            &bridge
+        } else {
+            caller_networks
+        };
+        let callee = if callee_networks.is_empty() {
+            &bridge
+        } else {
+            callee_networks
+        };
         caller.iter().any(|n| callee.contains(n))
     }
 }
@@ -26,12 +34,18 @@ mod tests {
 
     #[test]
     fn same_network_allowed() {
-        assert!(NetworkPolicy::check_access(&nets(&["prod"]), &nets(&["prod"])));
+        assert!(NetworkPolicy::check_access(
+            &nets(&["prod"]),
+            &nets(&["prod"])
+        ));
     }
 
     #[test]
     fn disjoint_networks_denied() {
-        assert!(!NetworkPolicy::check_access(&nets(&["prod"]), &nets(&["staging"])));
+        assert!(!NetworkPolicy::check_access(
+            &nets(&["prod"]),
+            &nets(&["staging"])
+        ));
     }
 
     #[test]

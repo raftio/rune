@@ -22,9 +22,10 @@ fn restart_daemon(args: &DebugArgs) -> Result<()> {
 
     if pid_path.exists() {
         let raw = std::fs::read_to_string(pid_path)?;
-        let pid: i32 = raw.trim().parse().map_err(|_| {
-            anyhow::anyhow!("invalid pid in {}: {:?}", args.pid_file, raw.trim())
-        })?;
+        let pid: i32 = raw
+            .trim()
+            .parse()
+            .map_err(|_| anyhow::anyhow!("invalid pid in {}: {:?}", args.pid_file, raw.trim()))?;
 
         if process_alive(pid) {
             println!();
@@ -60,7 +61,10 @@ fn restart_daemon(args: &DebugArgs) -> Result<()> {
 
     cmd.spawn()?;
 
-    println!("  \x1b[32m▲\x1b[0m Rune restarted with \x1b[1mRUST_LOG={}\x1b[0m", args.log_level);
+    println!(
+        "  \x1b[32m▲\x1b[0m Rune restarted with \x1b[1mRUST_LOG={}\x1b[0m",
+        args.log_level
+    );
     println!("    \x1b[2mLog file\x1b[0m  {}", args.log_file);
     println!();
     println!("  Run \x1b[1mrune debug\x1b[0m to tail logs.");

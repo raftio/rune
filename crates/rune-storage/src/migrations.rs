@@ -397,12 +397,11 @@ pub async fn run_migrations(db: &SqlitePool) -> Result<(), StorageError> {
     .await?;
 
     for m in MIGRATIONS {
-        let applied: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM _migrations WHERE version = ?)",
-        )
-        .bind(m.version)
-        .fetch_one(db)
-        .await?;
+        let applied: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM _migrations WHERE version = ?)")
+                .bind(m.version)
+                .fetch_one(db)
+                .await?;
 
         if applied {
             continue;

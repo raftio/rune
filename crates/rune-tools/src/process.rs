@@ -40,10 +40,16 @@ pub async fn start(
     input: &serde_json::Value,
     ctx: &ToolContext,
 ) -> Result<serde_json::Value, String> {
-    let command = input["command"].as_str().ok_or("Missing 'command' parameter")?;
+    let command = input["command"]
+        .as_str()
+        .ok_or("Missing 'command' parameter")?;
     let args: Vec<String> = input["args"]
         .as_array()
-        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default();
 
     let mut procs = ctx.process_manager.processes.lock().await;
@@ -116,15 +122,18 @@ pub async fn start(
         format!("{command} {}", args.join(" "))
     };
 
-    procs.insert(id.clone(), ManagedProcess {
-        id: id.clone(),
-        command: cmd_display.clone(),
-        child,
-        stdout_buf,
-        stderr_buf,
-        stdin,
-        started_at: chrono::Utc::now(),
-    });
+    procs.insert(
+        id.clone(),
+        ManagedProcess {
+            id: id.clone(),
+            command: cmd_display.clone(),
+            child,
+            stdout_buf,
+            stderr_buf,
+            stdin,
+            started_at: chrono::Utc::now(),
+        },
+    );
 
     Ok(serde_json::json!({
         "process_id": id,
@@ -137,9 +146,13 @@ pub async fn poll(
     input: &serde_json::Value,
     ctx: &ToolContext,
 ) -> Result<serde_json::Value, String> {
-    let pid = input["process_id"].as_str().ok_or("Missing 'process_id' parameter")?;
+    let pid = input["process_id"]
+        .as_str()
+        .ok_or("Missing 'process_id' parameter")?;
     let procs = ctx.process_manager.processes.lock().await;
-    let proc = procs.get(pid).ok_or_else(|| format!("Process '{pid}' not found"))?;
+    let proc = procs
+        .get(pid)
+        .ok_or_else(|| format!("Process '{pid}' not found"))?;
 
     let mut stdout = proc.stdout_buf.lock().await;
     let mut stderr = proc.stderr_buf.lock().await;
@@ -162,11 +175,15 @@ pub async fn write(
     input: &serde_json::Value,
     ctx: &ToolContext,
 ) -> Result<serde_json::Value, String> {
-    let pid = input["process_id"].as_str().ok_or("Missing 'process_id' parameter")?;
+    let pid = input["process_id"]
+        .as_str()
+        .ok_or("Missing 'process_id' parameter")?;
     let data = input["data"].as_str().ok_or("Missing 'data' parameter")?;
 
     let mut procs = ctx.process_manager.processes.lock().await;
-    let proc = procs.get_mut(pid).ok_or_else(|| format!("Process '{pid}' not found"))?;
+    let proc = procs
+        .get_mut(pid)
+        .ok_or_else(|| format!("Process '{pid}' not found"))?;
 
     let stdin = proc.stdin.as_mut().ok_or("Process stdin not available")?;
     let mut to_write = data.to_string();
@@ -192,9 +209,13 @@ pub async fn kill(
     input: &serde_json::Value,
     ctx: &ToolContext,
 ) -> Result<serde_json::Value, String> {
-    let pid = input["process_id"].as_str().ok_or("Missing 'process_id' parameter")?;
+    let pid = input["process_id"]
+        .as_str()
+        .ok_or("Missing 'process_id' parameter")?;
     let mut procs = ctx.process_manager.processes.lock().await;
-    let mut proc = procs.remove(pid).ok_or_else(|| format!("Process '{pid}' not found"))?;
+    let mut proc = procs
+        .remove(pid)
+        .ok_or_else(|| format!("Process '{pid}' not found"))?;
 
     let _ = proc.child.kill().await;
 

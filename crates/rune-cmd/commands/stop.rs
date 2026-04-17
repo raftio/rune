@@ -16,14 +16,17 @@ pub fn exec(args: StopArgs) -> Result<()> {
     }
 
     let raw = std::fs::read_to_string(pid_path)?;
-    let pid: i32 = raw.trim().parse().map_err(|_| {
-        anyhow::anyhow!("invalid pid in {}: {:?}", args.pid_file, raw.trim())
-    })?;
+    let pid: i32 = raw
+        .trim()
+        .parse()
+        .map_err(|_| anyhow::anyhow!("invalid pid in {}: {:?}", args.pid_file, raw.trim()))?;
 
     if !process_alive(pid) {
         std::fs::remove_file(pid_path)?;
         println!();
-        println!("  \x1b[33m▲\x1b[0m Process {pid} not running \x1b[2m(stale PID file removed)\x1b[0m");
+        println!(
+            "  \x1b[33m▲\x1b[0m Process {pid} not running \x1b[2m(stale PID file removed)\x1b[0m"
+        );
         println!();
         return Ok(());
     }
