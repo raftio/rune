@@ -2,8 +2,6 @@
 
 Library for **materializing** a local agent directory into an unpacked OAI bundle (`agent/manifest.json` + packable files), **exporting** that tree to a deterministic gzip-compressed tar (`.tar.gz`), and for **verifying** or **extracting** bundles for runtime use.
 
-Longer background: [Open Agent Initiative white paper](../../docs/concepts/open-agent-initiative.md).
-
 ## Open Agent Initiative (OAI)
 
 **Open Agent Initiative (OAI)** is the working name for this **portable agent bundle** format in Rune: a tree that `rune_spec::AgentPackage::load` can consume from the `agent/` root — reproducible `Runefile` plus metadata.

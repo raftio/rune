@@ -60,28 +60,3 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Getting Started:
-    - Installation: getting-started/installation.md
-    - Quick Start: getting-started/quickstart.md
-    - First Agent: getting-started/first-agent.md
-  - Concepts:
-    - Agents: concepts/agents.md
-    - Tools: concepts/tools.md
-    - Compose: concepts/compose.md
-    - Models: concepts/models.md
-    - Workflows: concepts/workflows.md
-    - Agent-to-Agent (A2A): concepts/a2a.md
-    - Channels: concepts/channels.md
-  - Reference:
-    - spec.yaml: reference/spec-yaml.md
-    - runtime.yaml: reference/runtime-yaml.md
-    - models.yaml: reference/models-yaml.md
-    - tools/*.yaml: reference/tools-yaml.md
-    - workflow.yaml: reference/workflow-yaml.md
-    - rune-compose.yaml: reference/compose-yaml.md
-    - CLI: reference/cli.md
-    - HTTP API: reference/api.md
-  - Architecture:
-    - Overview: architecture/overview.md
-  - Examples:
-    - Example Agents: examples/index.md

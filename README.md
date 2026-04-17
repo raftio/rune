@@ -14,16 +14,9 @@
 - **Compose** — Deploy multiple agents together with dependency ordering
 - **Clustering** — Optional Raft consensus for multi-node high-availability deployments
 
-## Quick Links
+## Documentation
 
-- [Installation](getting-started/installation.md) — Build and install the Rune CLI
-- [Quick Start](getting-started/quickstart.md) — Deploy your first agent in minutes
-- [First Agent](getting-started/first-agent.md) — Build an agent with a custom tool from scratch
-- [MCP](concepts/mcp.md) — Using Rune with Claude Desktop, Cursor, and external MCP servers
-- [Examples](examples/index.md) — Browse all example agents
-- [CLI Reference](reference/cli.md) — All `rune` commands
-- [HTTP API](reference/api.md) — Gateway endpoints
-- [Architecture](architecture/overview.md) — System design and crate map
+- [Project overview](docs/index.md) — Introduction and feature summary
 
 ## Project Layout
 
@@ -37,4 +30,4 @@ my-agent/
     └── my_tool.py   # or .js, .wasm, Dockerfile
 ```
 
-For multi-agent stacks, a `rune-compose.yml` deploys everything together. See [examples](examples/index.md) for complete samples.
+For multi-agent stacks, a `rune-compose.yml` deploys everything together. See the [`examples/`](examples/) directory for complete samples.
