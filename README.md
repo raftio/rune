@@ -14,10 +14,6 @@
 - **Compose** — Deploy multiple agents together with dependency ordering
 - **Clustering** — Optional Raft consensus for multi-node high-availability deployments
 
-## Documentation
-
-- [Project overview](docs/index.md) — Introduction and feature summary
-
 ## Project Layout
 
 Each agent is defined by a `Runefile` — a single YAML file combining identity, runtime, and model configuration:
