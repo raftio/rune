@@ -1,13 +1,17 @@
 //! Portable **rune-artifact** bundles: a versioned `manifest.json` plus packable agent files under
 //! an `agent/` tree (same layout [`rune_spec::AgentPackage::load`] expects).
 //!
+//! Packed paths (relative to `agent/`) include `Runefile` and files under `tools/`, `skills/`, and
+//! `schemas/` so process tools, local skills, and JSON schemas referenced from tool YAML are
+//! shipped with the bundle.
+//!
 //! **Open Agent Initiative (OAI)** is the project’s name for this portable agent bundle format.
 //! It is **not** an [Open Container Initiative](https://opencontainers.org/) (OCI) **container**
 //! image; the payload is a deterministic bundle for agents, not a container runtime image.
 //!
 //! **Remote skills:** refs listed in `Runefile` but not present under `skills/` are **not**
-//! embedded (MVP packs on-disk files only). After load, `missing_skills` is populated the same as
-//! loading from a dev tree.
+//! embedded (only on-disk files under `skills/` are packed). After load, `missing_skills` is
+//! populated the same as loading from a dev tree.
 //!
 //! Typical flow: [`materialize_agent_bundle`](crate::materialize_agent_bundle) → ship directory or
 //! [`export_bundle_to_tar_gz_file`](crate::export_bundle_to_tar_gz_file) for a `.tar.gz` →

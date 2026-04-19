@@ -1,22 +1,20 @@
 use anyhow::Result;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
-use super::agent::{resolve_agent_from_runefile_path, resolve_agent_source_or_artifact};
 use crate::cli::RunArgs;
+use crate::commands::artifact::ensure_artifact_for_deploy;
 
 pub async fn exec(args: RunArgs) -> Result<()> {
-    let (_tmp, pkg) = if let Some(ref path) = args.file {
-        resolve_agent_from_runefile_path(path)?
-    } else {
-        let spec = args
-            .agent_spec
-            .as_deref()
-            .expect("clap requires agent_spec when --file is absent");
-        resolve_agent_source_or_artifact(spec)?
-    };
+    let http = reqwest::Client::new();
+    let (_tmp, pkg) = ensure_artifact_for_deploy(
+        &args.name,
+        &args.tag,
+        args.artifact_registry.as_deref(),
+        &http,
+    )
+    .await?;
     println!("Deploying {} v{} ...", pkg.spec.name, pkg.spec.version);
 
-    let http = reqwest::Client::new();
     let base = args.control_plane.trim_end_matches('/');
 
     let resp = http

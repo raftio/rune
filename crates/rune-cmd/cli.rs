@@ -45,10 +45,10 @@ pub enum Command {
         #[command(subcommand)]
         cmd: DaemonCommand,
     },
-    /// Stop a deployment (scale to 0 replicas)
-    Stop(StopAgentArgs),
-    /// Remove a deployment
-    Rm(RmAgentArgs),
+    /// Stop a deployment by agent name (scale to 0 replicas)
+    Stop(AgentStopArgs),
+    /// Remove a deployment by agent name
+    Rm(AgentRmArgs),
     /// Manage Raft cluster membership
     Cluster {
         #[command(subcommand)]
@@ -149,19 +149,20 @@ pub struct AgentRmArgs {
 
 #[derive(clap::Args)]
 pub struct RunArgs {
-    /// Path to a Runefile (YAML). Mutually exclusive with AGENT_SPEC.
-    #[arg(short = 'f', long = "file", conflicts_with = "agent_spec")]
-    pub file: Option<std::path::PathBuf>,
-
-    /// Local path (agent dir or Runefile), artifact agent name from `rune artifact ls`, or git://...
-    #[arg(required_unless_present = "file")]
-    pub agent_spec: Option<String>,
+    /// Agent name (artifact manifest `agent_name` under ~/.rune/artifacts; see `rune artifact build` / `rune artifact ls`)
+    pub name: String,
+    /// Bundle tag (materialized dir or `{name}-{tag}.tar.gz`)
+    #[arg(long, default_value = "latest")]
+    pub tag: String,
     #[arg(long, default_value = "dev")]
     pub namespace: String,
     #[arg(long, default_value = "stable")]
     pub alias: String,
     #[arg(long, default_value = "http://localhost:8081")]
     pub control_plane: String,
+    /// When the artifact is not local, GET `{base}/{name}-{tag}.tar.gz` (also env RUNE_ARTIFACT_REGISTRY_URL)
+    #[arg(long, env = "RUNE_ARTIFACT_REGISTRY_URL")]
+    pub artifact_registry: Option<String>,
 }
 
 #[derive(clap::Args)]
@@ -171,6 +172,9 @@ pub struct ChatArgs {
     /// Gateway base URL (default matches `rune daemon start`)
     #[arg(long, default_value = "http://localhost:8080")]
     pub gateway: String,
+    /// Stream SSE events (token, tool_start, tool_done, thinking, …). Requires ANTHROPIC_API_KEY or OPENAI_API_KEY on the gateway.
+    #[arg(long)]
+    pub stream: bool,
 }
 
 #[derive(clap::Args)]
@@ -229,23 +233,6 @@ pub enum BackendChoice {
 pub struct StopArgs {
     #[arg(long, default_value = "/tmp/rune.pid")]
     pub pid_file: String,
-}
-
-#[derive(clap::Args)]
-pub struct StopAgentArgs {
-    pub deployment_id: String,
-    #[arg(long, default_value = "http://localhost:8081")]
-    pub control_plane: String,
-}
-
-#[derive(clap::Args)]
-pub struct RmAgentArgs {
-    pub deployment_id: String,
-    /// Force delete even when cascade fails (disables foreign key checks)
-    #[arg(long)]
-    pub force: bool,
-    #[arg(long, default_value = "http://localhost:8081")]
-    pub control_plane: String,
 }
 
 #[derive(Subcommand)]

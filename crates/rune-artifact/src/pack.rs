@@ -49,8 +49,16 @@ struct PreparedBundle {
     files: Vec<(String, Vec<u8>)>,
 }
 
+/// Pack `Runefile` plus files under `tools/`, `skills/`, and `schemas/` (relative to agent root).
 fn allowed_relative_path(rel: &str) -> bool {
-    rel == "Runefile"
+    if rel.contains("..") || rel.starts_with('/') {
+        return false;
+    }
+    if rel == "Runefile" {
+        return true;
+    }
+    const PREFIXES: &[&str] = &["tools/", "skills/", "schemas/"];
+    PREFIXES.iter().any(|p| rel.starts_with(*p))
 }
 
 /// Collect (full_path, unix-style relative path) for every file that belongs in the artifact.
@@ -329,9 +337,17 @@ models:
         assert!(!allowed_relative_path("README.md"));
         assert!(!allowed_relative_path(".gitignore"));
         assert!(!allowed_relative_path("workflow.yaml"));
-        assert!(!allowed_relative_path("tools/search.yaml"));
-        assert!(!allowed_relative_path("skills/x.md"));
         assert!(!allowed_relative_path("src/main.rs"));
+        assert!(!allowed_relative_path("../Runefile"));
+        assert!(!allowed_relative_path("tools/../Runefile"));
+    }
+
+    #[test]
+    fn allows_tools_skills_schemas_trees() {
+        assert!(allowed_relative_path("tools/search.yaml"));
+        assert!(allowed_relative_path("tools/sum.py"));
+        assert!(allowed_relative_path("skills/foo/SKILL.md"));
+        assert!(allowed_relative_path("schemas/in.json"));
     }
 
     // --- collect_packable_files ---
@@ -348,11 +364,14 @@ models:
         let dir = tempfile::tempdir().unwrap();
         write_minimal_agent(dir.path());
         std::fs::write(dir.path().join("README.md"), "# readme").unwrap();
+        std::fs::create_dir_all(dir.path().join("tools")).unwrap();
+        std::fs::write(dir.path().join("tools/sum.py"), b"print(1)").unwrap();
 
         let files = collect_packable_files(dir.path()).unwrap();
         let rels: Vec<&str> = files.iter().map(|(_, r)| r.as_str()).collect();
 
         assert!(rels.contains(&"Runefile"));
+        assert!(rels.contains(&"tools/sum.py"));
         assert!(!rels.contains(&"README.md"));
     }
 
@@ -379,12 +398,15 @@ models:
         write_minimal_agent(dir.path());
         std::fs::write(dir.path().join("README.md"), "# readme").unwrap();
         std::fs::write(dir.path().join(".gitignore"), "target/\n").unwrap();
+        std::fs::create_dir_all(dir.path().join("tools")).unwrap();
+        std::fs::write(dir.path().join("tools/sum.py"), b"# tool").unwrap();
 
         let mut buf = Vec::new();
         pack_agent_dir(dir.path(), &mut buf, PackOptions::default()).unwrap();
 
         let paths = tar_entry_paths(&buf);
         assert!(paths.iter().any(|p| p == "agent/Runefile"));
+        assert!(paths.iter().any(|p| p == "agent/tools/sum.py"));
         assert!(!paths.iter().any(|p| p.contains("README.md")));
         assert!(!paths.iter().any(|p| p.contains(".gitignore")));
     }

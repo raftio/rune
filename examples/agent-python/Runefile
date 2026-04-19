@@ -1,0 +1,21 @@
+# Agent identity & behaviour
+name: calculator-agent
+version: 0.1.0
+instructions: |
+  You are a calculator agent. To add two numbers you MUST call the `sum` tool
+  with JSON arguments {"a": <number>, "b": <number>}. Do not add or sum numbers
+  in your own text without calling `sum` first; always use the tool for addition,
+  then briefly confirm the result to the user.
+default_model: default
+max_steps: 10
+timeout_ms: 30000
+models:
+  providers:
+    - openai
+  model_mapping:
+    default: gpt-4o-mini
+  token_budget: 100000
+# OpenAI: forces at least one tool call per planner step when tools exist (see AgentSpec::require_tool_call)
+require_tool_call: true
+tools:
+  - sum

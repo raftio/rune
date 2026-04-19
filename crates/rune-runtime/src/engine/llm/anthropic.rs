@@ -9,7 +9,7 @@ use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio_util::io::StreamReader;
 
-use super::{ApiTool, ContentBlock, LlmProvider, LlmResponse, StreamChunk};
+use super::{ApiTool, ContentBlock, LlmProvider, LlmRequestOptions, LlmResponse, StreamChunk};
 use crate::error::RuntimeError;
 
 pub struct AnthropicClient {
@@ -103,6 +103,7 @@ impl LlmProvider for AnthropicClient {
         messages: &[serde_json::Value],
         tools: &[ApiTool],
         max_tokens: u32,
+        _opts: &LlmRequestOptions,
     ) -> Result<LlmResponse, RuntimeError> {
         let body = Self::build_body(model, system, messages, tools, max_tokens, false)?;
         let resp = self.send_request(&body).await?;
@@ -130,6 +131,7 @@ impl LlmProvider for AnthropicClient {
         messages: &[serde_json::Value],
         tools: &[ApiTool],
         max_tokens: u32,
+        _opts: &LlmRequestOptions,
         on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
     ) -> Result<(), RuntimeError> {
         let body = Self::build_body(model, system, messages, tools, max_tokens, true)?;
@@ -182,6 +184,15 @@ impl LlmProvider for AnthropicClient {
                 Some("content_block_delta") => {
                     let idx = val["index"].as_u64().unwrap_or(0);
                     match val["delta"]["type"].as_str() {
+                        Some("thinking_delta") => {
+                            let text = val["delta"]["thinking"]
+                                .as_str()
+                                .unwrap_or("")
+                                .to_string();
+                            if !text.is_empty() {
+                                on_chunk(StreamChunk::Thinking(text));
+                            }
+                        }
                         Some("text_delta") => {
                             let text = val["delta"]["text"].as_str().unwrap_or("").to_string();
                             if !text.is_empty() {

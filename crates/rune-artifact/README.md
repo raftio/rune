@@ -20,6 +20,7 @@ The tree is rooted at `agent/`:
 
 - `agent/manifest.json` — `format: rune-artifact-v1`, optional `initiative: open-agent`, `tag` (from `rune artifact build --tag`, default `latest`), agent name, model, RFC3339 `created_at`, and a sorted `files` list (paths relative to `agent/`, excluding `manifest.json`).
 - `agent/Runefile`.
+- `agent/tools/**`, `agent/skills/**`, `agent/schemas/**` — included when present under the source agent directory (so scripts, WASM modules, skill markdown, and JSON schemas ship with the bundle).
 
 ## Loading with `AgentPackage`
 

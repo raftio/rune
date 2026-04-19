@@ -472,6 +472,30 @@ async fn handle_message_stream(
 
         while let Some(event) = sse_rx.recv().await {
             let (a2a_event, is_terminal) = match event {
+                SseEvent::Thinking { text } => {
+                    let update = TaskArtifactUpdateEvent {
+                        task_id: task_for_bridge.clone(),
+                        context_id: context_for_bridge.clone(),
+                        artifact: Artifact {
+                            artifact_id: "thinking".into(),
+                            name: Some("thinking".into()),
+                            description: None,
+                            parts: vec![Part::text(&text)],
+                            metadata: None,
+                        },
+                        append: false,
+                        last_chunk: false,
+                        metadata: None,
+                        kind: "artifact-update".into(),
+                    };
+                    (
+                        JsonRpcResponse::success(
+                            rpc_for_bridge.clone(),
+                            serde_json::to_value(&update).unwrap_or_default(),
+                        ),
+                        false,
+                    )
+                }
                 SseEvent::Token { text } => {
                     full_text.push_str(&text);
                     let update = TaskArtifactUpdateEvent {
