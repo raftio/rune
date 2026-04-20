@@ -3,7 +3,9 @@ use uuid::Uuid;
 use crate::error::RuntimeError;
 use crate::metrics;
 
-use super::llm::{tools_to_api, user_input_to_content, ContentBlock, LlmClient};
+use super::llm::{
+    tools_to_api, user_input_to_content, ContentBlock, LlmClient, LlmRequestOptions,
+};
 use super::loader::ExecutionPlan;
 use super::policy::{PolicyDecision, PolicyEngine};
 use super::session::{Message, SessionManager};
@@ -100,6 +102,9 @@ impl Planner {
 
         let api_messages = Self::to_api_messages(messages);
         let api_tools = tools_to_api(&self.plan.tools);
+        let llm_opts = LlmRequestOptions {
+            require_tool_call: self.plan.require_tool_call,
+        };
 
         let resp = client
             .call(
@@ -108,6 +113,7 @@ impl Planner {
                 &api_messages,
                 &api_tools,
                 4096,
+                &llm_opts,
             )
             .await?;
 
@@ -279,6 +285,10 @@ impl StubPlanner {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SseEvent {
+    /// Extended thinking / reasoning text (provider-dependent).
+    Thinking {
+        text: String,
+    },
     Token {
         text: String,
     },
@@ -392,6 +402,16 @@ mod tests {
     }
 
     // --- SseEvent serialization ---
+
+    #[test]
+    fn sse_thinking_serializes_with_type_field() {
+        let ev = SseEvent::Thinking {
+            text: "step 1".into(),
+        };
+        let json = serde_json::to_value(&ev).unwrap();
+        assert_eq!(json["type"], "thinking");
+        assert_eq!(json["text"], "step 1");
+    }
 
     #[test]
     fn sse_token_serializes_with_type_field() {
@@ -515,6 +535,9 @@ impl Planner {
             }
 
             let api_messages = Self::to_api_messages(&messages);
+            let llm_opts = LlmRequestOptions {
+                require_tool_call: self.plan.require_tool_call,
+            };
 
             // Collect chunks via synchronous callback — avoids spawning or lifetime issues.
             let mut full_text = String::new();
@@ -529,8 +552,13 @@ impl Planner {
                     &api_messages,
                     &api_tools,
                     4096,
+                    &llm_opts,
                     &mut |chunk| {
                         match chunk {
+                            StreamChunk::Thinking(text) => {
+                                metrics::increment_streaming_events();
+                                let _ = tx.try_send(SseEvent::Thinking { text });
+                            }
                             StreamChunk::Token(text) => {
                                 full_text.push_str(&text);
                                 metrics::increment_streaming_events();

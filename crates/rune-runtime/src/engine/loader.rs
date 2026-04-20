@@ -118,7 +118,7 @@ toolset:
 
         let tools_dir = dir.path().join("tools");
         std::fs::create_dir(&tools_dir).unwrap();
-        std::fs::write(tools_dir.join("search.yaml"), "name: my_search\n").unwrap();
+        std::fs::write(tools_dir.join("my_search.py"), "# tool\n").unwrap();
 
         let plan = ExecutionPlan::from_dir(dir.path()).unwrap();
         assert!(plan.toolset.contains(&"rune@shell".to_string()));
@@ -405,6 +405,8 @@ pub struct ExecutionPlan {
     pub toolset: Vec<String>,
     /// rune-network memberships for this agent (default: ["bridge"]).
     pub networks: Vec<String>,
+    /// When true, OpenAI uses `tool_choice: required` when tools are registered (see `AgentSpec::require_tool_call`).
+    pub require_tool_call: bool,
 }
 
 fn skill_markdown_path(agent_dir: &Path, skill_ref: &str) -> PathBuf {
@@ -433,11 +435,8 @@ fn collect_local_skills(agent_dir: &Path, skill_refs: &[String]) -> (String, Vec
 }
 
 fn load_tools_from_agent_dir(agent_dir: &Path) -> Result<Vec<ToolDescriptor>, RuntimeError> {
-    let dir = agent_dir.join("tools");
-    if !dir.is_dir() {
-        return Ok(vec![]);
-    }
-    ToolDescriptor::load_dir(&dir).map_err(|e| RuntimeError::Spec(e.to_string()))
+    ToolDescriptor::discover_process_scripts(agent_dir)
+        .map_err(|e| RuntimeError::Spec(e.to_string()))
 }
 
 impl ExecutionPlan {
@@ -472,6 +471,7 @@ impl ExecutionPlan {
             models: pkg.spec.models.clone(),
             toolset,
             networks: pkg.spec.networks.clone(),
+            require_tool_call: pkg.spec.require_tool_call,
         })
     }
 
@@ -528,6 +528,7 @@ impl ExecutionPlan {
             models: pkg.spec.models.clone(),
             toolset,
             networks: pkg.spec.networks.clone(),
+            require_tool_call: pkg.spec.require_tool_call,
         })
     }
 
@@ -545,6 +546,7 @@ impl ExecutionPlan {
             models: ModelsSpec::default(),
             toolset: vec![],
             networks: vec!["bridge".into()],
+            require_tool_call: false,
         }
     }
 }

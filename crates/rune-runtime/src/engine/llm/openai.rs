@@ -9,7 +9,7 @@ use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio_util::io::StreamReader;
 
-use super::{ApiTool, ContentBlock, LlmProvider, LlmResponse, StreamChunk};
+use super::{ApiTool, ContentBlock, LlmProvider, LlmRequestOptions, LlmResponse, StreamChunk};
 use crate::error::RuntimeError;
 
 fn extract_text_from_blocks(content: &serde_json::Value) -> String {
@@ -159,6 +159,7 @@ impl OpenAiClient {
         tools: &[ApiTool],
         max_tokens: u32,
         stream: bool,
+        opts: &LlmRequestOptions,
     ) -> serde_json::Value {
         let mut oai_msgs = vec![serde_json::json!({"role": "system", "content": system})];
         oai_msgs.extend(Self::to_openai_messages(messages));
@@ -173,7 +174,11 @@ impl OpenAiClient {
         }
         if !tools.is_empty() {
             body["tools"] = serde_json::json!(Self::oai_tools(tools));
-            body["tool_choice"] = serde_json::json!("auto");
+            body["tool_choice"] = if opts.require_tool_call {
+                serde_json::json!("required")
+            } else {
+                serde_json::json!("auto")
+            };
         }
         body
     }
@@ -217,8 +222,9 @@ impl LlmProvider for OpenAiClient {
         messages: &[serde_json::Value],
         tools: &[ApiTool],
         max_tokens: u32,
+        opts: &LlmRequestOptions,
     ) -> Result<LlmResponse, RuntimeError> {
-        let body = self.build_body(system, messages, tools, max_tokens, false);
+        let body = self.build_body(system, messages, tools, max_tokens, false, opts);
         let resp = self.send_request(&body).await?;
 
         #[derive(Deserialize)]
@@ -287,9 +293,10 @@ impl LlmProvider for OpenAiClient {
         messages: &[serde_json::Value],
         tools: &[ApiTool],
         max_tokens: u32,
+        opts: &LlmRequestOptions,
         on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
     ) -> Result<(), RuntimeError> {
-        let body = self.build_body(system, messages, tools, max_tokens, true);
+        let body = self.build_body(system, messages, tools, max_tokens, true, opts);
         let resp = match self.send_request(&body).await {
             Ok(r) => r,
             Err(e) => {

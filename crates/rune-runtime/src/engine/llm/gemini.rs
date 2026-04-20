@@ -11,7 +11,7 @@ use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio_util::io::StreamReader;
 
-use super::{ApiTool, ContentBlock, LlmProvider, LlmResponse, StreamChunk};
+use super::{ApiTool, ContentBlock, LlmProvider, LlmRequestOptions, LlmResponse, StreamChunk};
 use crate::error::RuntimeError;
 
 const GEMINI_BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta/models";
@@ -208,6 +208,7 @@ impl LlmProvider for GeminiClient {
         messages: &[serde_json::Value],
         tools: &[ApiTool],
         max_tokens: u32,
+        _opts: &LlmRequestOptions,
     ) -> Result<LlmResponse, RuntimeError> {
         let body = Self::build_body(system, messages, tools, max_tokens);
         let resp = self
@@ -272,6 +273,7 @@ impl LlmProvider for GeminiClient {
         messages: &[serde_json::Value],
         tools: &[ApiTool],
         max_tokens: u32,
+        _opts: &LlmRequestOptions,
         on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
     ) -> Result<(), RuntimeError> {
         let body = Self::build_body(system, messages, tools, max_tokens);

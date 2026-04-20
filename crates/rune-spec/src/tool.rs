@@ -101,17 +101,92 @@ impl ToolDescriptor {
             .map_err(|e| SpecError::Parse(path.display().to_string(), e.to_string()))
     }
 
-    /// Load all `*.yaml` tool descriptors from a directory.
-    pub fn load_dir(dir: &Path) -> Result<Vec<Self>, SpecError> {
-        let mut tools = vec![];
-        for entry in std::fs::read_dir(dir).map_err(|e| SpecError::Io(dir.to_path_buf(), e))? {
-            let entry = entry.map_err(|e| SpecError::Io(dir.to_path_buf(), e))?;
+    /// Extensions supported for process tools (must match `rune-runtime` process runner interpreters).
+    pub const PROCESS_SCRIPT_EXTENSIONS: [&str; 4] = ["py", "js", "mjs", "ts"];
+
+    fn is_process_script_path(path: &Path) -> bool {
+        path.extension()
+            .and_then(|e| e.to_str())
+            .map(|e| {
+                Self::PROCESS_SCRIPT_EXTENSIONS
+                    .iter()
+                    .any(|ext| ext.eq_ignore_ascii_case(e))
+            })
+            .unwrap_or(false)
+    }
+
+    /// Build a process-tool descriptor from a script file under `agent_dir` (e.g. `tools/sum.py`).
+    pub fn for_process_script_file(agent_dir: &Path, script_path: &Path) -> Result<Self, SpecError> {
+        if !script_path.is_file() {
+            return Err(SpecError::Validation(format!(
+                "not a file: {}",
+                script_path.display()
+            )));
+        }
+        if !Self::is_process_script_path(script_path) {
+            return Err(SpecError::Validation(format!(
+                "unsupported tool script extension: {}",
+                script_path.display()
+            )));
+        }
+        let rel = script_path.strip_prefix(agent_dir).map_err(|_| {
+            SpecError::Validation(format!(
+                "script {} is not under agent directory {}",
+                script_path.display(),
+                agent_dir.display()
+            ))
+        })?;
+        let module = rel.to_string_lossy().replace('\\', "/");
+        let name = script_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| {
+                SpecError::Validation(format!("invalid tool script name: {}", script_path.display()))
+            })?
+            .to_string();
+
+        Ok(Self {
+            name,
+            version: default_version(),
+            runtime: ToolRuntime::Process,
+            module,
+            timeout_ms: default_timeout_ms(),
+            retry_policy: RetryPolicy::default(),
+            capabilities: vec![],
+            input_schema_ref: None,
+            output_schema_ref: None,
+            agent_ref: None,
+            max_depth: None,
+            mcp_server: None,
+        })
+    }
+
+    /// Discover `tools/*.py`, `tools/*.js`, `tools/*.mjs`, `tools/*.ts` and build process tool descriptors.
+    pub fn discover_process_scripts(agent_dir: &Path) -> Result<Vec<Self>, SpecError> {
+        let dir = agent_dir.join("tools");
+        if !dir.is_dir() {
+            return Ok(vec![]);
+        }
+
+        let mut paths: Vec<std::path::PathBuf> = Vec::new();
+        for entry in std::fs::read_dir(&dir).map_err(|e| SpecError::Io(dir.clone(), e))? {
+            let entry = entry.map_err(|e| SpecError::Io(dir.clone(), e))?;
             let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) == Some("yaml") {
-                tools.push(Self::load(&path)?);
+            if path.is_file() && Self::is_process_script_path(&path) {
+                paths.push(path);
             }
         }
-        Ok(tools)
+        paths.sort_by(|a, b| {
+            a.file_name()
+                .unwrap_or_default()
+                .cmp(b.file_name().unwrap_or_default())
+        });
+
+        paths
+            .into_iter()
+            .map(|p| Self::for_process_script_file(agent_dir, &p))
+            .collect()
     }
 }
 
@@ -290,47 +365,59 @@ timeout_ms: 30000
     }
 
     #[test]
-    fn load_dir_missing_dir_returns_io_error() {
-        let err = ToolDescriptor::load_dir(Path::new("/nonexistent/tools")).unwrap_err();
-        assert!(err.to_string().contains("IO error"));
-    }
-
-    #[test]
-    fn load_dir_loads_yaml_files_only() {
+    fn discover_process_scripts_missing_tools_dir_returns_empty() {
         let dir = tempfile::tempdir().unwrap();
-        let tool_yaml = "name: tool_a\ntimeout_ms: 1000\n";
-        std::fs::write(dir.path().join("tool_a.yaml"), tool_yaml).unwrap();
-        std::fs::write(dir.path().join("README.md"), "docs").unwrap();
-        std::fs::write(dir.path().join("config.toml"), "key = val").unwrap();
-
-        let tools = ToolDescriptor::load_dir(dir.path()).unwrap();
-        assert_eq!(tools.len(), 1);
-        assert_eq!(tools[0].name, "tool_a");
-    }
-
-    #[test]
-    fn load_dir_loads_multiple_tools() {
-        let dir = tempfile::tempdir().unwrap();
-        for name in &["alpha", "beta", "gamma"] {
-            std::fs::write(
-                dir.path().join(format!("{name}.yaml")),
-                format!("name: {name}\n"),
-            )
-            .unwrap();
-        }
-
-        let mut tools = ToolDescriptor::load_dir(dir.path()).unwrap();
-        tools.sort_by(|a, b| a.name.cmp(&b.name));
-        assert_eq!(tools.len(), 3);
-        assert_eq!(tools[0].name, "alpha");
-        assert_eq!(tools[1].name, "beta");
-        assert_eq!(tools[2].name, "gamma");
-    }
-
-    #[test]
-    fn load_dir_empty_dir_returns_empty_vec() {
-        let dir = tempfile::tempdir().unwrap();
-        let tools = ToolDescriptor::load_dir(dir.path()).unwrap();
+        let tools = ToolDescriptor::discover_process_scripts(dir.path()).unwrap();
         assert!(tools.is_empty());
+    }
+
+    #[test]
+    fn discover_process_scripts_ignores_non_scripts() {
+        let dir = tempfile::tempdir().unwrap();
+        let tools_sub = dir.path().join("tools");
+        std::fs::create_dir(&tools_sub).unwrap();
+        std::fs::write(tools_sub.join("README.md"), "docs").unwrap();
+        std::fs::write(tools_sub.join("config.yaml"), "name: x\n").unwrap();
+
+        let tools = ToolDescriptor::discover_process_scripts(dir.path()).unwrap();
+        assert!(tools.is_empty());
+    }
+
+    #[test]
+    fn discover_process_scripts_loads_py_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let tools_sub = dir.path().join("tools");
+        std::fs::create_dir(&tools_sub).unwrap();
+        std::fs::write(tools_sub.join("alpha.py"), "# x").unwrap();
+
+        let tools = ToolDescriptor::discover_process_scripts(dir.path()).unwrap();
+        assert_eq!(tools.len(), 1);
+        assert_eq!(tools[0].name, "alpha");
+        assert_eq!(tools[0].module, "tools/alpha.py");
+        assert!(matches!(tools[0].runtime, ToolRuntime::Process));
+    }
+
+    #[test]
+    fn discover_process_scripts_sorts_by_filename() {
+        let dir = tempfile::tempdir().unwrap();
+        let tools_sub = dir.path().join("tools");
+        std::fs::create_dir(&tools_sub).unwrap();
+        std::fs::write(tools_sub.join("z.py"), "#").unwrap();
+        std::fs::write(tools_sub.join("a.py"), "#").unwrap();
+
+        let tools = ToolDescriptor::discover_process_scripts(dir.path()).unwrap();
+        assert_eq!(tools.len(), 2);
+        assert_eq!(tools[0].name, "a");
+        assert_eq!(tools[1].name, "z");
+    }
+
+    #[test]
+    fn for_process_script_file_rejects_unsupported_extension() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("tools/x.rb");
+        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+        std::fs::write(&p, "#").unwrap();
+        let err = ToolDescriptor::for_process_script_file(dir.path(), &p).unwrap_err();
+        assert!(err.to_string().contains("unsupported"));
     }
 }

@@ -33,6 +33,8 @@ tracing-opentelemetry = { workspace = true }
 anyhow = { workspace = true }
 uuid = { workspace = true }
 reqwest = { workspace = true }
+futures-util = { workspace = true }
+tokio-util = { workspace = true, features = ["io"] }
 tempfile = { workspace = true }
 nix = { workspace = true }
 chrono = { workspace = true }

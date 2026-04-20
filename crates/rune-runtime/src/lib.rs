@@ -25,9 +25,9 @@ pub use reconcile::ReconcileLoop;
 pub use router::{ReplicaLease, ReplicaRouter};
 
 pub use engine::{
-    Action, AnthropicClient, ContentBlock, ExecutionPlan, LlmClient, Message, OpenAiClient,
-    Planner, PolicyEngine, RuntimeAgentOps, SessionManager, SseEvent, StreamChunk, StubPlanner,
-    ToolDispatcher, WorkflowExecutor,
+    Action, AnthropicClient, ContentBlock, ExecutionPlan, LlmClient, LlmRequestOptions, Message,
+    OpenAiClient, Planner, PolicyEngine, RuntimeAgentOps, SessionManager, SseEvent, StreamChunk,
+    StubPlanner, ToolDispatcher, WorkflowExecutor,
 };
 
 pub use rune_storage::{self, RuneStore};

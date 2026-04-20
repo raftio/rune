@@ -3,7 +3,7 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use rune_artifact::PackOptions;
 use rune_spec::AgentPackage;
 
@@ -301,112 +301,111 @@ pub fn ls() -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug)]
-enum StoredBundle {
-    Dir(PathBuf),
-    Tar(PathBuf),
-}
-
-/// Load an agent package from `~/.rune/artifacts` by manifest `agent_name`.
-/// Prefers tag `latest`, then newest mtime.
-pub fn load_by_stored_agent_name(
+/// Load `~/.rune/artifacts/{name}-{tag}/` or `{name}-{tag}.tar.gz` (exact tag).
+pub fn load_stored_artifact_exact(
     name: &str,
+    tag: &str,
 ) -> Result<(Option<tempfile::TempDir>, AgentPackage)> {
     if name.is_empty() || name.contains('/') || name.contains('\\') {
-        anyhow::bail!(
-            "invalid artifact name {:?}: use a plain agent name, a filesystem path, or git://...",
+        bail!(
+            "invalid artifact name {:?}: use a plain agent name (no path separators)",
             name
         );
     }
-
-    let dir = artifacts_root()?;
-    if !dir.is_dir() {
-        anyhow::bail!(
-            "no stored artifact {:?}: artifacts directory {} does not exist; use a path, `rune artifact build`, or git://...",
-            name,
-            dir.display()
+    if tag.is_empty() || tag.contains('/') || tag.contains('\\') {
+        bail!(
+            "invalid artifact tag {:?}: use a plain tag (no path separators)",
+            tag
         );
     }
 
-    let mut candidates: Vec<(StoredBundle, Option<String>, std::time::SystemTime)> = Vec::new();
+    let bundle_root = artifact_bundle_dir(name, tag)?;
+    if is_materialized_bundle(&bundle_root) {
+        let pkg = AgentPackage::load(&bundle_root.join("agent")).with_context(|| {
+            format!(
+                "load agent from materialized bundle {}",
+                bundle_root.display()
+            )
+        })?;
+        return Ok((None, pkg));
+    }
 
-    for entry in std::fs::read_dir(&dir).with_context(|| format!("read {}", dir.display()))? {
-        let entry = entry.with_context(|| format!("read entry in {}", dir.display()))?;
-        let path = entry.path();
-        let meta = entry
-            .metadata()
-            .with_context(|| format!("stat {}", path.display()))?;
+    let tar_path = artifact_tar_path(name, tag)?;
+    if tar_path.is_file() {
+        let f = File::open(&tar_path).with_context(|| format!("open {}", tar_path.display()))?;
+        let (tmp, pkg) = rune_artifact::extract_and_load_package(f)
+            .with_context(|| format!("extract artifact {}", tar_path.display()))?;
+        return Ok((Some(tmp), pkg));
+    }
 
-        if meta.is_dir() {
-            if !is_materialized_bundle(&path) {
-                continue;
-            }
-            let m = match rune_artifact::read_manifest_dir(&path) {
-                Ok(m) => m,
-                Err(_) => continue,
+    let root = artifacts_root()?;
+    bail!(
+        "artifact not found locally: expected {} or {} under {}",
+        bundle_root.display(),
+        tar_path.display(),
+        root.display()
+    );
+}
+
+/// For `rune run`: resolve artifact locally first, then optional HTTP registry (`{base}/{sanitized}-{sanitized}.tar.gz`).
+pub async fn ensure_artifact_for_deploy(
+    name: &str,
+    tag: &str,
+    registry_base: Option<&str>,
+    http: &reqwest::Client,
+) -> Result<(Option<tempfile::TempDir>, AgentPackage)> {
+    match load_stored_artifact_exact(name, tag) {
+        Ok(pkg) => Ok(pkg),
+        Err(local_err) => {
+            let Some(base) = registry_base.map(str::trim).filter(|s| !s.is_empty()) else {
+                return Err(local_err.context(
+                    "set RUNE_ARTIFACT_REGISTRY_URL or pass --artifact-registry to download, or run `rune artifact build`",
+                ));
             };
-            if m.agent_name != name {
-                continue;
+
+            let fname = format!(
+                "{}-{}.tar.gz",
+                sanitize_filename_component(name),
+                sanitize_filename_component(tag)
+            );
+            let url = format!("{}/{}", base.trim_end_matches('/'), fname);
+
+            let mut req = http.get(&url);
+            if let Ok(tok) = std::env::var("RUNE_ARTIFACT_REGISTRY_TOKEN") {
+                if !tok.is_empty() {
+                    req = req.bearer_auth(tok);
+                }
             }
-            let mtime = meta.modified().unwrap_or(UNIX_EPOCH);
-            candidates.push((StoredBundle::Dir(path), m.tag, mtime));
-            continue;
-        }
 
-        if !meta.is_file() {
-            continue;
-        }
-        let fname = entry.file_name();
-        let Some(fname_str) = fname.to_str() else {
-            continue;
-        };
-        if !fname_str.ends_with(".tar.gz") {
-            continue;
-        }
-        let m = match File::open(&path) {
-            Ok(f) => match rune_artifact::read_manifest(f) {
-                Ok(m) => m,
-                Err(_) => continue,
-            },
-            Err(_) => continue,
-        };
-        if m.agent_name != name {
-            continue;
-        }
-        let mtime = meta.modified().unwrap_or(UNIX_EPOCH);
-        candidates.push((StoredBundle::Tar(path), m.tag, mtime));
-    }
+            let resp = req.send().await.with_context(|| format!("GET {url}"))?;
+            let status = resp.status();
+            if status == reqwest::StatusCode::NOT_FOUND {
+                bail!(
+                    "artifact {name}:{tag} not found locally and registry returned 404 for {url}"
+                );
+            }
+            if !status.is_success() {
+                let body = resp.text().await.unwrap_or_default();
+                bail!(
+                    "registry error for {url}: {status}{}",
+                    if body.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" — {body}")
+                    }
+                );
+            }
 
-    if candidates.is_empty() {
-        anyhow::bail!(
-            "no stored artifact with agent name {:?} under {}; use `rune artifact ls`, a local path, or git://...",
-            name,
-            dir.display()
-        );
-    }
+            let bytes = resp.bytes().await.with_context(|| format!("read body {url}"))?;
+            prepare_artifacts_parent()?;
+            let dest = artifact_tar_path(name, tag)?;
+            std::fs::write(&dest, &bytes)
+                .with_context(|| format!("write downloaded artifact to {}", dest.display()))?;
 
-    candidates.sort_by(|a, b| {
-        let a_latest = a.1.as_deref() == Some("latest");
-        let b_latest = b.1.as_deref() == Some("latest");
-        b_latest
-            .cmp(&a_latest)
-            .then_with(|| {
-                let ta = a.2.duration_since(UNIX_EPOCH).unwrap_or_default();
-                let tb = b.2.duration_since(UNIX_EPOCH).unwrap_or_default();
-                tb.cmp(&ta)
-            })
-    });
-
-    match &candidates[0].0 {
-        StoredBundle::Dir(root) => {
-            let pkg = AgentPackage::load(&root.join("agent"))
-                .with_context(|| format!("load agent from {}", root.display()))?;
-            Ok((None, pkg))
-        }
-        StoredBundle::Tar(tar_path) => {
-            let f = File::open(tar_path).with_context(|| format!("open {}", tar_path.display()))?;
+            let f = File::open(&dest).with_context(|| format!("open {}", dest.display()))?;
             let (tmp, pkg) = rune_artifact::extract_and_load_package(f)
-                .with_context(|| format!("extract artifact {}", tar_path.display()))?;
+                .with_context(|| format!("extract downloaded artifact {}", dest.display()))?;
+            eprintln!("  fetched artifact from registry: {url}");
             Ok((Some(tmp), pkg))
         }
     }

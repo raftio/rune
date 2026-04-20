@@ -40,9 +40,18 @@ pub struct LlmResponse {
     pub content: Vec<ContentBlock>,
 }
 
+/// Per-request options for LLM calls (not all providers honor every field).
+#[derive(Debug, Clone, Default)]
+pub struct LlmRequestOptions {
+    /// When true, OpenAI uses `tool_choice: "required"` if `tools` is non-empty.
+    pub require_tool_call: bool,
+}
+
 /// A chunk produced during streaming.
 #[derive(Debug)]
 pub enum StreamChunk {
+    /// Model reasoning / extended thinking (when the provider exposes it).
+    Thinking(String),
     Token(String),
     ToolUse {
         id: String,
@@ -277,6 +286,7 @@ pub trait LlmProvider: Send + Sync {
         messages: &[serde_json::Value],
         tools: &[ApiTool],
         max_tokens: u32,
+        opts: &LlmRequestOptions,
     ) -> Result<LlmResponse, RuntimeError>;
 
     async fn stream(
@@ -286,6 +296,7 @@ pub trait LlmProvider: Send + Sync {
         messages: &[serde_json::Value],
         tools: &[ApiTool],
         max_tokens: u32,
+        opts: &LlmRequestOptions,
         on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
     ) -> Result<(), RuntimeError>;
 }
@@ -359,13 +370,14 @@ impl LlmClient {
         messages: &[serde_json::Value],
         tools: &[ApiTool],
         max_tokens: u32,
+        opts: &LlmRequestOptions,
     ) -> Result<LlmResponse, RuntimeError> {
         let model = model_override.unwrap_or_else(|| self.inner.default_model());
         let provider = self.inner.provider_name();
         let start = std::time::Instant::now();
         let result = self
             .inner
-            .call(model, system, messages, tools, max_tokens)
+            .call(model, system, messages, tools, max_tokens, opts)
             .await;
         crate::metrics::record_model_call_duration(provider, model, start.elapsed().as_secs_f64());
         result
@@ -378,11 +390,12 @@ impl LlmClient {
         messages: &[serde_json::Value],
         tools: &[ApiTool],
         max_tokens: u32,
+        opts: &LlmRequestOptions,
         on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
     ) -> Result<(), RuntimeError> {
         let model = model_override.unwrap_or_else(|| self.inner.default_model());
         self.inner
-            .stream(model, system, messages, tools, max_tokens, on_chunk)
+            .stream(model, system, messages, tools, max_tokens, opts, on_chunk)
             .await
     }
 }

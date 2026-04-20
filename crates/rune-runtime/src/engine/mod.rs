@@ -10,7 +10,7 @@ pub mod wasm_runner;
 pub mod workflow;
 
 pub use agent_ops::RuntimeAgentOps;
-pub use llm::{AnthropicClient, ContentBlock, LlmClient, OpenAiClient, StreamChunk};
+pub use llm::{AnthropicClient, ContentBlock, LlmClient, LlmRequestOptions, OpenAiClient, StreamChunk};
 pub use loader::ExecutionPlan;
 pub use planner::{Action, Planner, SseEvent, StubPlanner};
 pub use policy::{audit_policy_decision, PolicyDecision, PolicyEngine};

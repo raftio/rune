@@ -6,7 +6,7 @@
 use async_trait::async_trait;
 
 use super::openai::OpenAiClient;
-use super::{ApiTool, LlmProvider, LlmResponse, StreamChunk};
+use super::{ApiTool, LlmProvider, LlmRequestOptions, LlmResponse, StreamChunk};
 use crate::error::RuntimeError;
 
 const COPILOT_BASE_URL: &str = "https://api.githubcopilot.com";
@@ -54,9 +54,10 @@ impl LlmProvider for CopilotClient {
         messages: &[serde_json::Value],
         tools: &[ApiTool],
         max_tokens: u32,
+        opts: &LlmRequestOptions,
     ) -> Result<LlmResponse, RuntimeError> {
         self.0
-            .call(model, system, messages, tools, max_tokens)
+            .call(model, system, messages, tools, max_tokens, opts)
             .await
     }
 
@@ -67,10 +68,11 @@ impl LlmProvider for CopilotClient {
         messages: &[serde_json::Value],
         tools: &[ApiTool],
         max_tokens: u32,
+        opts: &LlmRequestOptions,
         on_chunk: &mut (dyn FnMut(StreamChunk) + Send),
     ) -> Result<(), RuntimeError> {
         self.0
-            .stream(model, system, messages, tools, max_tokens, on_chunk)
+            .stream(model, system, messages, tools, max_tokens, opts, on_chunk)
             .await
     }
 }

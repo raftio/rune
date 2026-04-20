@@ -25,8 +25,8 @@ pub struct AgentSpec {
     pub default_model: String,
     #[serde(default)]
     pub models: ModelsSpec,
-    /// Built-in (`rune@…`) and custom tool names; merged with tools discovered under `tools/*.yaml`.
-    #[serde(default)]
+    /// Built-in (`rune@…`) and custom tool names; merged with tools discovered as scripts under `tools/`.
+    #[serde(default, alias = "tools")]
     pub toolset: Vec<String>,
     /// Network memberships for rune-network policy (default: `bridge`).
     #[serde(default = "default_networks")]
@@ -34,6 +34,9 @@ pub struct AgentSpec {
     /// Remote or local skill refs (`owner/repo/skill-name`); local copies live under `skills/`.
     #[serde(default)]
     pub skills: Vec<String>,
+    /// When true, OpenAI chat completions use `tool_choice: "required"` whenever tools are present (forces at least one tool call per step).
+    #[serde(default)]
+    pub require_tool_call: bool,
 }
 
 fn default_networks() -> Vec<String> {
@@ -76,6 +79,28 @@ models:
         assert_eq!(spec.instructions, "You are a test agent.");
         assert_eq!(spec.default_model, "default");
         assert_eq!(spec.models.model_mapping["default"], "claude-sonnet-4-6");
+    }
+
+    #[test]
+    fn parse_tools_alias_maps_to_toolset() {
+        let yaml = r#"
+name: alias-agent
+version: 0.1.0
+instructions: Hi.
+default_model: default
+models:
+  model_mapping:
+    default: claude-sonnet-4-6
+tools:
+  - sum
+  - rune@shell
+"#;
+        let spec: AgentSpec = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(spec.name, "alias-agent");
+        assert_eq!(
+            spec.toolset,
+            vec!["sum".to_string(), "rune@shell".to_string()]
+        );
     }
 
     #[test]

@@ -50,28 +50,6 @@ pub fn resolve_agent_source(
     }
 }
 
-/// `rune run -f /path/to/Runefile.yaml`
-pub fn resolve_agent_from_runefile_path(
-    path: &Path,
-) -> Result<(Option<tempfile::TempDir>, rune_spec::AgentPackage)> {
-    use rune_spec::AgentPackage;
-    let pkg = AgentPackage::load_runefile(path)?;
-    Ok((None, pkg))
-}
-
-/// Local path, `git://...`, or stored artifact name (see `rune artifact ls`).
-pub fn resolve_agent_source_or_artifact(
-    agent_spec: &str,
-) -> Result<(Option<tempfile::TempDir>, rune_spec::AgentPackage)> {
-    if agent_spec.starts_with("git://") {
-        return resolve_agent_source(agent_spec);
-    }
-    if Path::new(agent_spec).exists() {
-        return resolve_agent_source(agent_spec);
-    }
-    crate::commands::artifact::load_by_stored_agent_name(agent_spec)
-}
-
 // ---------------------------------------------------------------------------
 // Runtime management helpers
 // ---------------------------------------------------------------------------
